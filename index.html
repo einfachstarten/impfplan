@@ -404,8 +404,8 @@
                     openFAQ: null,
                     currentTime: new Date(),
                     dismissedCards: {},
-                    showLoader: true,
-                    loadingComplete: false
+                    showLoader: false,
+                    loadingComplete: true
                 };
                 
                 this.demoData = {
@@ -848,20 +848,7 @@
             }
 
             renderLoader() {
-                if (!this.state.showLoader) return '';
-
-                return `
-                    <div class="cat-loader-overlay ${this.state.loadingComplete ? 'fade-out' : ''}">
-                        <div class="cat">
-                            <div class="cat__body cat-img-base"></div>
-                            <div class="cat__body cat-img-base"></div>
-                            <div class="cat__tail cat-img-base"></div>
-                            <div class="cat__head cat-img-base"></div>
-                        </div>
-                        <h1 class="loader-title">Behandlungs-Tracker</h1>
-                        <p class="loader-subtitle">Lade deine Katzen-Therapie App...</p>
-                    </div>
-                `;
+                return '';
             }
 
             getMilestoneCountdown(upcomingMilestone, today) {
