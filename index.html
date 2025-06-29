@@ -377,6 +377,10 @@
                     concentration: localStorage.getItem('treatment-concentration') || '',
                     customDose: localStorage.getItem('treatment-customDose') || '',
                     reminderTime: localStorage.getItem('treatment-reminderTime') || '19:30',
+                    setupStep: 0,
+                    isSetupComplete: false,
+                    catAge: '',
+                    catBreed: '',
                     treatmentData: JSON.parse(localStorage.getItem('treatment-progress') || '{}'),
                     diary: JSON.parse(localStorage.getItem('treatment-diary') || '{}'),
                     notificationsEnabled: false,
@@ -1064,6 +1068,287 @@
                 this.render();
             }
 
+            nextStep() {
+                if (this.validateCurrentStep()) {
+                    if (this.state.setupStep < 2) {
+                        this.state.setupStep++;
+                    } else {
+                        this.state.isSetupComplete = true;
+                        this.state.setupStep = 0;
+                    }
+                    this.render();
+                }
+            }
+
+            prevStep() {
+                if (this.state.setupStep > 0) {
+                    this.state.setupStep--;
+                    this.render();
+                }
+            }
+
+            validateCurrentStep() {
+                switch(this.state.setupStep) {
+                    case 0:
+                        return this.state.catName.length >= 2 &&
+                               this.state.catWeight >= 0.5 &&
+                               this.state.catWeight <= 15;
+                    case 1:
+                        return this.state.fipType && this.state.concentration;
+                    case 2:
+                        return this.state.startDate && this.state.reminderTime;
+                    default:
+                        return true;
+                }
+            }
+
+            renderCatStep() {
+                return `
+        <div class="space-y-6">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">Deine Katze 🐱</h2>
+                <p class="text-gray-600">Erzähl uns von deinem Liebling</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Name der Katze *
+                </label>
+                <input type="text" value="${this.state.catName}" 
+                    onchange="app.updateState('catName', this.value)"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-3 text-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="z.B. Mimi, Luna, Felix...">
+                ${this.state.catName.length > 0 && this.state.catName.length < 2 ? `
+                    <p class="text-red-500 text-xs mt-1">Mindestens 2 Zeichen</p>
+                ` : ''}
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Gewicht * <span class="text-blue-600 font-semibold">${this.state.catWeight ? this.state.catWeight + ' kg' : ''}</span>
+                </label>
+                <div class="flex items-center gap-4">
+                    <span class="text-sm text-gray-500">0.5kg</span>
+                    <input type="range" min="0.5" max="15" step="0.1" value="${this.state.catWeight || 3.5}"
+                        oninput="app.updateState('catWeight', this.value)"
+                        class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider">
+                    <span class="text-sm text-gray-500">15kg</span>
+                    <input type="number" step="0.1" min="0.5" max="15" value="${this.state.catWeight}"
+                        onchange="app.updateState('catWeight', this.value)"
+                        class="w-20 border border-gray-300 rounded px-2 py-1 text-sm">
+                </div>
+                ${this.getWeightFeedback()}
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Alter (optional)
+                    </label>
+                    <input type="text" value="${this.state.catAge}" 
+                        onchange="app.updateState('catAge', this.value)"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2"
+                        placeholder="z.B. 3 Jahre">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Rasse (optional)
+                    </label>
+                    <input type="text" value="${this.state.catBreed}" 
+                        onchange="app.updateState('catBreed', this.value)"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2"
+                        placeholder="z.B. Maine Coon">
+                </div>
+            </div>
+        </div>
+                `;
+            }
+
+            getWeightFeedback() {
+                const weight = parseFloat(this.state.catWeight);
+                if (!weight) return '';
+
+                if (weight < 1.5) return '<p class="text-orange-500 text-xs mt-1">⚠️ Sehr leichte Katze - bitte nochmal prüfen</p>';
+                if (weight > 8) return '<p class="text-orange-500 text-xs mt-1">⚠️ Schwere Katze - Admin konsultieren</p>';
+                if (weight >= 2.5 && weight <= 5.5) return '<p class="text-green-500 text-xs mt-1">✅ Ideales Gewicht für Hauskatze</p>';
+                return '<p class="text-blue-500 text-xs mt-1">📏 Wöchentlich wiegen nicht vergessen</p>';
+            }
+renderTreatmentStep() {
+    const dailyDose = this.calculateDose();
+    return `
+<div class="space-y-6">
+    <div class="text-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-2">Behandlung 💉</h2>
+        <p class="text-gray-600">Welche Art der Behandlung braucht ${this.state.catName}?</p>
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium text-gray-700 mb-4">Behandlungsart *</label>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            ${[
+                {key: 'neuro', icon: '🧠', title: 'Neurologisch', dose: '10 mg/kg', desc: 'ZNS betroffen, höchste Dosis'},
+                {key: 'ocular', icon: '👁️', title: 'Okulär', dose: '8 mg/kg', desc: 'Augen betroffen, mittlere Dosis'},
+                {key: 'wet_dry', icon: '🫁', title: 'Standard', dose: '6 mg/kg', desc: 'Feucht/Trocken, Standarddosis'}
+            ].map(type => `
+                <div onclick="app.updateState('fipType', '${type.key}')" class="p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    this.state.fipType === type.key ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+                }">
+                    <div class="text-3xl mb-2 text-center">${type.icon}</div>
+                    <h3 class="font-semibold text-center mb-1">${type.title}</h3>
+                    <p class="text-sm text-center text-blue-600 font-medium">${type.dose}</p>
+                    <p class="text-xs text-center text-gray-500 mt-2">${type.desc}</p>
+                </div>
+            ).join('')}
+        </div>
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium text-gray-700 mb-4">Konzentration *</label>
+        <div class="flex flex-wrap gap-3">
+            ${['15', '16', '20'].map(conc => `
+                <button onclick="app.updateState('concentration', '${conc}')" class="px-4 py-2 rounded-lg border-2 font-medium transition-all ${
+                    this.state.concentration === conc ? 'border-blue-500 bg-blue-500 text-white' : 'border-gray-300 text-gray-700 hover:border-blue-300'
+                }">${conc} mg/ml</button>
+            ).join('')}
+            <div class="flex items-center gap-2">
+                <input type="number" placeholder="Custom" value="${this.state.concentration && !['15','16','20'].includes(this.state.concentration) ? this.state.concentration : ''}"
+                    onchange="app.updateState('concentration', this.value)"
+                    class="w-20 border border-gray-300 rounded px-2 py-1 text-sm">
+                <span class="text-xs text-gray-500">mg/ml</span>
+            </div>
+        </div>
+    </div>
+
+    ${dailyDose ? `
+        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div class="flex items-center gap-3">
+                <svg class="text-green-600 w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
+                </svg>
+                <div>
+                    <p class="text-lg font-bold text-green-800">${this.state.catName} bekommt täglich ${dailyDose} ml</p>
+                    <p class="text-sm text-gray-600">${this.state.catWeight} kg × ${this.state.fipType === 'neuro' ? '10' : this.state.fipType === 'ocular' ? '8' : '6'} mg/kg ÷ ${this.state.concentration} mg/ml = ${dailyDose} ml</p>
+                </div>
+            </div>
+        </div>
+    ` : ''}
+</div>
+    `;
+}
+
+
+            renderScheduleStep() {
+                return `
+        <div class="space-y-6">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">Zeitplan 📅</h2>
+                <p class="text-gray-600">Wann soll die 84-Tage Behandlung starten?</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Startdatum *</label>
+                <input type="date" value="${this.state.startDate}" 
+                    onchange="app.updateState('startDate', this.value)"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-3 text-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Tägliche Erinnerung *</label>
+                <input type="time" value="${this.state.reminderTime}" 
+                    onchange="app.updateState('reminderTime', this.value)"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-3 text-lg focus:ring-2 focus:ring-blue-500">
+                <p class="text-xs text-gray-500 mt-1">💡 ±30min früher, ±15min später ist OK</p>
+            </div>
+
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                <h3 class="font-semibold text-blue-800 mb-4">📋 Zusammenfassung</h3>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span>Katze:</span>
+                        <span class="font-medium">${this.state.catName} (${this.state.catWeight} kg)</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Behandlung:</span>
+                        <span class="font-medium">
+                            ${
+                                this.state.fipType === 'neuro' ? 'Neurologisch' :
+                                this.state.fipType === 'ocular' ? 'Okulär' : 'Standard'
+                            }
+                        </span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Tägliche Dosis:</span>
+                        <span class="font-medium text-green-600">${this.calculateDose()} ml</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Behandlungszeitraum:</span>
+                        <span class="font-medium">${this.formatDateRange()}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Erinnerung:</span>
+                        <span class="font-medium">Täglich um ${this.state.reminderTime}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+                `;
+            }
+
+            formatDateRange() {
+                if (!this.state.startDate) return 'Nicht festgelegt';
+                const start = new Date(this.state.startDate);
+                const end = new Date(start);
+                end.setDate(start.getDate() + 83);
+                return `${start.toLocaleDateString('de-DE')} - ${end.toLocaleDateString('de-DE')}`;
+            }
+
+            renderWizard() {
+                const steps = ['Deine Katze', 'Behandlung', 'Zeitplan'];
+                const currentStep = this.state.setupStep;
+                return `
+        <div class="max-w-2xl mx-auto">
+            <div class="flex items-center justify-center mb-8">
+                ${steps.map((step, index) => `
+                    <div class="flex items-center ${index < steps.length - 1 ? 'flex-1' : ''}">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                                index < currentStep ? 'bg-green-500 text-white' :
+                                index === currentStep ? 'bg-blue-500 text-white' :
+                                'bg-gray-200 text-gray-600'
+                            }">
+                                ${index < currentStep ? '✓' : index + 1}
+                            </div>
+                            <span class="text-sm font-medium ${
+                                index <= currentStep ? 'text-gray-800' : 'text-gray-400'
+                            }">${step}</span>
+                        </div>
+                        ${index < steps.length - 1 ? `<div class="flex-1 h-px bg-gray-200 mx-4"></div>` : ''}
+                    </div>
+                ).join('')}
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                ${
+                    currentStep === 0 ? this.renderCatStep() :
+                    currentStep === 1 ? this.renderTreatmentStep() :
+                    this.renderScheduleStep()
+                }
+            </div>
+
+            <div class="flex justify-between">
+                <button onclick="app.prevStep()" 
+                    class="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors ${currentStep === 0 ? 'invisible' : ''}">
+                    ← Zurück
+                </button>
+                <button onclick="app.nextStep()" 
+                    class="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    ${!this.validateCurrentStep() ? 'disabled' : ''}>
+                    ${currentStep === 2 ? 'Behandlung starten! 🚀' : 'Weiter →'}
+                </button>
+            </div>
+        </div>
+                `;
+            }
             render() {
                 const dailyDose = this.state.customDose ? parseFloat(this.state.customDose) : this.calculateDose();
                 const treatmentDays = this.state.startDate ? this.generateTreatmentDays(this.state.startDate) : [];
@@ -1137,84 +1422,9 @@
                                 </div>
                             </div>
 
-                            ${!this.state.startDate && !this.state.isDemo ? `
-                                <div class="space-y-6">
-                                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                                        <div class="flex items-center gap-3 mb-4">
-                                            <svg class="text-blue-600 w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                                                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/>
-                                            </svg>
-                                            <h2 class="text-xl font-semibold text-blue-800">Medikamenten-Dosisberechnung</h2>
-                                        </div>
-                                        
-                                        <div class="mobile-grid md:grid-cols-2 gap-4 mb-4">
-                                            <div class="col-span-full mb-4">
-                                                <label class="block text-sm font-medium text-gray-700 mb-2">
-                                                    🐱 Name der Katze
-                                                </label>
-                                                <input data-demo="cat-name-input" type="text" value="${this.state.catName}"
-                                                    onchange="app.updateState('catName', this.value)"
-                                                    class="w-full border border-gray-300 rounded-md px-3 py-2 mobile-input"
-                                                    placeholder="z.B. Mimi">
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-2">
-                                                    Gewicht der Katze (kg)
-                                                </label>
-                                                <input data-demo="weight-input" type="number" step="0.1" value="${this.state.catWeight}"
-                                                    onchange="app.updateState('catWeight', this.value)"
-                                                    class="w-full border border-gray-300 rounded-md px-3 py-2 mobile-input" placeholder="z.B. 3.7">
-                                            </div>
+                            ${!this.state.isSetupComplete && !this.state.isDemo ? this.renderWizard() : ""}
 
-                                            <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-2">Behandlungsart</label>
-                                                <select data-demo="fip-type-select" value="${this.state.fipType}" onchange="app.updateState('fipType', this.value)"
-                                                    class="w-full border border-gray-300 rounded-md px-3 py-2 mobile-input">
-                                                    <option value="">Wählen...</option>
-                                                    <option value="neuro" ${this.state.fipType === 'neuro' ? 'selected' : ''}>Neurologisch (10 mg/kg)</option>
-                                                    <option value="ocular" ${this.state.fipType === 'ocular' ? 'selected' : ''}>Okulär (8 mg/kg)</option>
-                                                    <option value="wet_dry" ${this.state.fipType === 'wet_dry' ? 'selected' : ''}>Standard (6 mg/kg)</option>
-                                                </select>
-                                            </div>
-
-                                            <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-2">
-                                                    Konzentration (mg/ml)
-                                                </label>
-                                                <input type="number" value="${this.state.concentration}" 
-                                                    onchange="app.updateState('concentration', this.value)"
-                                                    class="w-full border border-gray-300 rounded-md px-3 py-2 mobile-input" placeholder="z.B. 16">
-                                            </div>
-
-                                            <div>
-                                                <label class="block text-sm font-medium text-gray-700 mb-2">Startdatum</label>
-                                                <input type="date" value="${this.state.startDate}" 
-                                                    onchange="app.updateState('startDate', this.value)"
-                                                    class="w-full border border-gray-300 rounded-md px-3 py-2 mobile-input">
-                                            </div>
-                                        </div>
-
-                                        ${dailyDose ? `
-                                            <div data-demo="dose-display" class="bg-green-50 border border-green-200 rounded-lg p-4">
-                                                <div class="flex items-center gap-3">
-                                                    <svg class="text-green-600 w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                                                        <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
-                                                    </svg>
-                                                    <div>
-                                                        <p class="text-lg font-bold text-green-800">Tägliche Dosis: ${dailyDose} ml</p>
-                                                        <p class="text-sm text-gray-600">
-                                                            ${this.state.catWeight} kg × ${this.state.fipType === 'neuro' ? '10' : this.state.fipType === 'ocular' ? '8' : '6'} mg/kg ÷ ${this.state.concentration} mg/ml = ${dailyDose} ml
-                                                        </p>
-                                                        <p class="text-xs text-gray-500 mt-1">💡 Automatisch auf 1 Nachkommastelle aufgerundet</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ` : ''}
-                                    </div>
-                                </div>
-                            ` : ''}
-
-                            ${(this.state.startDate || this.state.isDemo) && dailyDose ? `
+                            ${(this.state.isSetupComplete || this.state.isDemo) && dailyDose ? `
                                 <!-- Weight & Dose Management -->
                                 <div class="bg-gray-50 rounded-lg p-4 mb-6">
                                     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1520,6 +1730,10 @@
                 this.state.concentration = '';
                 this.state.customDose = '';
                 this.state.catName = '';
+                this.state.catAge = '';
+                this.state.catBreed = '';
+                this.state.setupStep = 0;
+                this.state.isSetupComplete = false;
                 
                 // Clear all localStorage
                 localStorage.removeItem('treatment-startDate');
@@ -1572,7 +1786,7 @@
     }
     </script>
     <footer class="text-center text-sm text-gray-500 mt-4">
-      Version 1.0.20250629165820
+      Version 1.0.20250629172612
     </footer>
 </body>
 </html>
