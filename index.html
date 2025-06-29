@@ -436,6 +436,82 @@
                 }
             }
 
+            getMilestoneCountdown(upcomingMilestone, today) {
+                if (!upcomingMilestone) return null;
+                const todayDate = new Date(today);
+                const milestoneDate = new Date(upcomingMilestone.date);
+                const diffTime = milestoneDate - todayDate;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                return diffDays;
+            }
+
+            getMotivationalMessage(completedCount, todayTreatment) {
+                const messages = {
+                    0: { icon: '🌟', text: 'Der erste Schritt ist der wichtigste! Du schaffst das!', color: 'blue' },
+                    7: { icon: '🎯', text: 'Eine Woche geschafft! Du und deine Katze seid ein tolles Team!', color: 'green' },
+                    14: { icon: '💪', text: '2 Wochen durch! Jeder Tag bringt euch der Heilung näher!', color: 'green' },
+                    21: { icon: '🌈', text: '3 Wochen! Die Routine sitzt, ihr seid stark!', color: 'purple' },
+                    28: { icon: '🩸', text: 'Blutbild-Zeit! Ein wichtiger Meilenstein erreicht!', color: 'red' },
+                    42: { icon: '🚀', text: 'Halbzeit! 42 Tage geschafft - ihr seid Helden!', color: 'blue' },
+                    56: { icon: '🔥', text: '2 Monate durch! Das Schlimmste habt ihr hinter euch!', color: 'orange' },
+                    70: { icon: '🏔️', text: 'Bergfest! Nur noch 2 Wochen bis zum Ziel!', color: 'indigo' },
+                    77: { icon: '🎉', text: 'Fast geschafft! Das Ende ist in Sicht!', color: 'pink' },
+                    84: { icon: '🏆', text: 'GESCHAFFT! Ihr habt gemeinsam gekämpft und gewonnen!', color: 'yellow' }
+                };
+
+                const milestones = Object.keys(messages).map(Number).sort((a, b) => b - a);
+                const currentMilestone = milestones.find(m => completedCount >= m) || 0;
+                return messages[currentMilestone];
+            }
+
+            renderSupportMessage() {
+                const hardDays = [10, 20, 30, 40, 50, 60];
+                const currentDay = Object.values(this.state.treatmentData).filter(Boolean).length;
+
+                if (hardDays.includes(currentDay)) {
+                    return `
+                      <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4">
+                        <div class="flex items-center gap-3">
+                          <svg class="text-indigo-600 w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                          </svg>
+                          <div>
+                            <p class="font-medium text-indigo-800">
+                              💙 Heute ist ein besonderer Tag - du hilfst deiner Katze zu heilen!
+                            </p>
+                            <p class="text-sm text-indigo-600 mt-1">
+                              Es ist ok, wenn es manchmal schwer ist. Du machst das Richtige. 🐱💕
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    `;
+                }
+                return '';
+            }
+
+            getStreak() {
+                if (!this.state.startDate) return 0;
+                const today = new Date().toISOString().split('T')[0];
+                let streak = 0;
+                const startDate = new Date(this.state.startDate);
+
+                for (let i = 0; i < 84; i++) {
+                    const checkDate = new Date(startDate);
+                    checkDate.setDate(startDate.getDate() + i);
+                    const dateStr = checkDate.toISOString().split('T')[0];
+
+                    if (checkDate > new Date(today)) break;
+
+                    if (this.state.treatmentData[dateStr]) {
+                        streak++;
+                    } else {
+                        streak = 0;
+                    }
+                }
+                return streak;
+            }
+
             render() {
                 const dailyDose = this.state.customDose ? parseFloat(this.state.customDose) : this.calculateDose();
                 const treatmentDays = this.state.startDate ? this.generateTreatmentDays(this.state.startDate) : [];
@@ -461,6 +537,8 @@
                 }
 
                 const upcomingMilestone = treatmentDays.find(day => day.date >= today && day.isMilestone);
+                const motivationalMessage = this.getMotivationalMessage(completedCount, todayTreatment);
+                const streak = this.getStreak();
 
                 document.getElementById('app').innerHTML = `
                     ${this.state.showFAQ ? this.renderFAQ() : ''}
@@ -681,6 +759,22 @@
                                         ${Math.round(progressPercentage)}% abgeschlossen • ${84 - completedCount} Tage verbleibend
                                     </p>
 
+                                    <div class="bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-200 rounded-lg p-4 mb-6">
+                                        <div class="flex items-center gap-3">
+                                            <div class="text-2xl">${motivationalMessage.icon}</div>
+                                            <div class="flex-1">
+                                                <p class="font-semibold text-${motivationalMessage.color}-800 mb-1">
+                                                    ${motivationalMessage.text}
+                                                </p>
+                                                <p class="text-xs text-gray-600">
+                                                    ✨ Jede Spritze ist ein Schritt zur Heilung • 💝 Du rettest ein Leben • 🔥 Streak: ${streak} Tage
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    ${this.renderSupportMessage()}
+
                                     ${upcomingMilestone ? `
                                         <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
                                             <div class="flex items-center gap-2">
@@ -688,11 +782,23 @@
                                                     <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
                                                 </svg>
                                                 <p class="text-sm font-medium text-amber-800">
-                                                    Nächster Meilenstein: ${upcomingMilestone.isMilestone.icon} ${upcomingMilestone.isMilestone.text} (Tag ${upcomingMilestone.day})
+                                                    Nächster Meilenstein: ${upcomingMilestone.isMilestone.icon} ${upcomingMilestone.isMilestone.text} 
+                                                    <span class="font-bold">(Tag ${upcomingMilestone.day}, in ${this.getMilestoneCountdown(upcomingMilestone, today)} Tagen)</span>
                                                 </p>
                                             </div>
                                         </div>
                                     ` : ''}
+
+                                    <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mt-4">
+                                      <div class="text-center">
+                                        <div class="text-emerald-700 text-sm font-medium mb-1">
+                                          💚 FIP ist heilbar!
+                                        </div>
+                                        <div class="text-xs text-emerald-600">
+                                          84 Tage können das Leben deiner Katze retten • Durchhaltevermögen wird belohnt
+                                        </div>
+                                      </div>
+                                    </div>
                                 </div>
 
                                 ${todayStatus ? `
