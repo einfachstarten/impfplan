@@ -123,6 +123,149 @@
                 box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.05);
             }
         }
+
+        /* Cat Loader Styles */
+        .cat-loader-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease-out;
+        }
+
+        .cat-loader-overlay.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .cat {
+            position: relative;
+            width: 100%;
+            max-width: 12em;
+            overflow: hidden;
+            background-color: #e6dcdc;
+            border-radius: 50%;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .cat::before {
+            content: '';
+            display: block;
+            padding-bottom: 100%;
+        }
+
+        .cat:hover > * {
+            animation-play-state: paused;
+        }
+
+        .cat:active > * {
+            animation-play-state: running;
+        }
+
+        .cat-img-base {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            animation: rotating 2.79s cubic-bezier(.65, .54, .12, .93) infinite;
+        }
+
+        .cat-img-base::before {
+            content: '';
+            position: absolute;
+            width: 50%;
+            height: 50%;
+            background-size: 200%;
+            background-repeat: no-repeat;
+            background-image: url('https://images.weserv.nl/?url=i.imgur.com/M1raXX3.png&il');
+        }
+
+        .cat__head::before {
+            top: 0;
+            right: 0;
+            background-position: 100% 0%;
+            transform-origin: 0% 100%;
+            transform: rotate(90deg);
+        }
+
+        .cat__tail {
+            animation-delay: 0.2s;
+        }
+
+        .cat__tail::before {
+            left: 0;
+            bottom: 0;
+            background-position: 0% 100%;
+            transform-origin: 100% 0%;
+            transform: rotate(-30deg);
+        }
+
+        .cat__body {
+            animation-delay: 0.1s;
+        }
+
+        .cat__body:nth-of-type(2) {
+            animation-delay: 0.2s;
+        }
+
+        .cat__body::before {
+            right: 0;
+            bottom: 0;
+            background-position: 100% 100%;
+            transform-origin: 0% 0%;
+        }
+
+        @keyframes rotating {
+            from { transform: rotate(720deg); }
+            to { transform: none; }
+        }
+
+        .loader-title {
+            margin-top: 2rem;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #374151;
+            text-align: center;
+            animation: fade-in-up 1s ease-out 0.5s both;
+        }
+
+        .loader-subtitle {
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+            color: #6B7280;
+            text-align: center;
+            animation: fade-in-up 1s ease-out 0.8s both;
+        }
+
+        @keyframes fade-in-up {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 640px) {
+            .cat { max-width: 10em; }
+            .loader-title { font-size: 1.25rem; }
+        }
+
+        .cat-skeleton {
+            width: 10em;
+            height: 10em;
+            position: relative;
+            animation: skeleton-pulse 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes skeleton-pulse {
+            0% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -217,7 +360,9 @@
                     showFAQ: false,
                     openFAQ: null,
                     currentTime: new Date(),
-                    dismissedCards: {}
+                    dismissedCards: {},
+                    showLoader: true,
+                    loadingComplete: false
                 };
                 
                 this.demoData = {
@@ -229,12 +374,21 @@
                     reminderTime: '19:30'
                 };
 
+                const img = new Image();
+                img.src = 'https://images.weserv.nl/?url=i.imgur.com/M1raXX3.png&il';
+
                 this.init();
             }
 
             init() {
                 this.render();
-                
+
+                setTimeout(() => {
+                    this.state.showLoader = false;
+                    this.state.loadingComplete = true;
+                    this.render();
+                }, 2500);
+
                 // Update time every minute
                 setInterval(() => {
                     this.state.currentTime = new Date();
@@ -479,6 +633,7 @@
                             </div>
                         </div>
                     </div>
+                    ` : ''}
                 `;
             }
 
@@ -509,6 +664,7 @@
                             </div>
                         </div>
                     </div>
+                    ` : ''}
                 `;
             }
 
@@ -526,6 +682,34 @@
                     target.classList.add('demo-highlight', 'ring-4', 'ring-blue-400', 'ring-opacity-75');
                     target.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
+            }
+
+            renderSkeletonCat() {
+                return `
+                    <div class="cat-skeleton">
+                        <div class="skeleton-circle"></div>
+                        <div class="skeleton-body"></div>
+                        <div class="skeleton-tail"></div>
+                    </div>
+                    ` : ''}
+                `;
+            }
+
+            renderLoader() {
+                if (!this.state.showLoader) return '';
+
+                return `
+                    <div class="cat-loader-overlay ${this.state.loadingComplete ? 'fade-out' : ''}">
+                        <div class="cat">
+                            <div class="cat__body cat-img-base"></div>
+                            <div class="cat__body cat-img-base"></div>
+                            <div class="cat__tail cat-img-base"></div>
+                            <div class="cat__head cat-img-base"></div>
+                        </div>
+                        <h1 class="loader-title">Behandlungs-Tracker</h1>
+                        <p class="loader-subtitle">Lade deine Katzen-Therapie App...</p>
+                    </div>
+                `;
             }
 
             getMilestoneCountdown(upcomingMilestone, today) {
@@ -661,9 +845,11 @@
                 const streak = this.getStreak();
 
                 document.getElementById('app').innerHTML = `
+                    ${this.renderLoader()}
                     ${this.state.showFAQ ? this.renderFAQ() : ''}
                     ${this.renderDemoOverlay()}
-                    
+
+                    ${!this.state.showLoader ? `
                     <div class="max-w-4xl mx-auto p-4 md:p-6 bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen">
                         <div class="bg-white rounded-xl shadow-lg mobile-compact md:p-6 mb-6">
                             <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
@@ -1072,6 +1258,7 @@
                             ` : ''}
                         </div>
                     </div>
+                    ` : ''}
                 `;
                 setTimeout(() => this.highlightDemoTarget(), 50);
             }
