@@ -11,6 +11,10 @@ RUN rm -rf /usr/share/nginx/html/*
 COPY index.html /usr/share/nginx/html/
 COPY sw.js /usr/share/nginx/html/
 COPY health.js /usr/share/nginx/html/
+COPY manifest.json /usr/share/nginx/html/
+COPY favicon.ico /usr/share/nginx/html/
+COPY icons/ /usr/share/nginx/html/icons/
+COPY screenshots/ /usr/share/nginx/html/screenshots/
 
 # Copy custom nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
