@@ -1,0 +1,9 @@
+.git
+.gitignore
+README.md
+.github
+node_modules
+npm-debug.log
+Dockerfile
+.dockerignore
+fly.toml
