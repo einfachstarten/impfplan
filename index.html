@@ -422,6 +422,7 @@
             init() {
                 this.loadDismissedCards();
                 this.checkNewDay();
+                this.state.isSetupComplete = this.hasRequiredInfo();
                 this.render();
 
                 setTimeout(() => {
@@ -477,6 +478,14 @@
                 if (day >= 77 && day <= 81) return { type: 'final', text: 'Abschluss-Untersuchung & Therapieende!', icon: '🎉' };
                 if (day === 84) return { type: 'complete', text: 'Behandlung abgeschlossen!', icon: '🏆' };
                 return null;
+            }
+
+            hasRequiredInfo() {
+                return this.state.catName &&
+                       this.state.catWeight &&
+                       this.state.fipType &&
+                       this.state.concentration &&
+                       this.state.startDate;
             }
 
             startDemo() {
@@ -696,6 +705,7 @@
                                 <div class="p-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
                                     <div class="text-center">
                                         <p class="text-xs text-gray-500">💡 Bei weiteren Fragen kontaktiere deinen Admin</p>
+                                        <button onclick="app.manualSetup()" class="hidden text-xs text-blue-500 underline mt-2">Setup-Assistent</button>
                                     </div>
                                 </div>
                             </div>
@@ -1755,6 +1765,12 @@ renderTreatmentStep() {
 
                 this.render();
             }
+
+            manualSetup() {
+                this.state.setupStep = 0;
+                this.state.isSetupComplete = false;
+                this.render();
+            }
         }
 
         // Initialize app
@@ -1786,7 +1802,7 @@ renderTreatmentStep() {
     }
     </script>
     <footer class="text-center text-sm text-gray-500 mt-4">
-      Version 1.0.20250629172612
+      Version 1.0.20250629180000
     </footer>
 </body>
 </html>
