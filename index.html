@@ -519,6 +519,8 @@
                 this.state.customDose = '';
                 this.state.treatmentData = {};
                 this.state.diary = {};
+                this.state.showLoader = false;
+                this.state.loadingComplete = true;
                 this.render();
             }
 
@@ -1435,6 +1437,9 @@
                 localStorage.removeItem('treatment-diary');
 
                 this.state.dismissedCards = {};
+
+                this.state.showLoader = false;
+                this.state.loadingComplete = true;
 
                 this.render();
             }
