@@ -187,60 +187,121 @@
             100% { opacity: 1; }
         }
 
-        /* Demo Overlay Enhancements */
-        .modal-arrow {
-            position: absolute;
-            width: 0;
-            height: 0;
-            border: 8px solid transparent;
-        }
 
-        .modal-arrow-left {
-            left: -16px;
+
+
+        /* Desktop Demo Modals - Seitliche Slide-In Panels */
+        .demo-modal-desktop {
+            position: fixed;
             top: 50%;
             transform: translateY(-50%);
-            border-right-color: white;
+            width: 320px;
+            max-height: 400px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 60;
         }
 
-        .modal-arrow-right {
-            right: -16px;
-            top: 50%;
-            transform: translateY(-50%);
-            border-left-color: white;
+        .demo-modal-right {
+            right: 20px;
+            transform: translateY(-50%) translateX(100%);
         }
 
-        .modal-arrow-top {
-            top: -16px;
-            left: 50%;
-            transform: translateX(-50%);
-            border-bottom-color: white;
+        .demo-modal-right.active {
+            transform: translateY(-50%) translateX(0);
         }
 
-        .modal-arrow-bottom {
-            bottom: -16px;
-            left: 50%;
-            transform: translateX(-50%);
-            border-top-color: white;
+        .demo-modal-left {
+            left: 20px;
+            transform: translateY(-50%) translateX(-100%);
         }
 
-        @keyframes spotlight-pulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
-            50% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+        .demo-modal-left.active {
+            transform: translateY(-50%) translateX(0);
         }
 
+        /* Connection Line from Modal to Target */
+        .demo-connection-line {
+            position: fixed;
+            height: 2px;
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.8), rgba(59, 130, 246, 0.2));
+            z-index: 55;
+            pointer-events: none;
+        }
+
+        .demo-connection-line.fade-line {
+            animation: pulse-line 2s infinite;
+        }
+
+        @keyframes pulse-line {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 0.3; }
+        }
+
+        /* Mobile Demo Modals - Bottom Sheet */
         @media (max-width: 768px) {
-            .demo-modal {
-                position: fixed !important;
-                bottom: 20px !important;
-                left: 20px !important;
-                right: 20px !important;
-                top: auto !important;
-                max-width: none !important;
+            .demo-modal-mobile {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: white;
+                border-radius: 16px 16px 0 0;
+                box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.1);
+                transform: translateY(100%);
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                z-index: 60;
+                max-height: 40vh;
             }
 
-            .modal-arrow {
-                display: none;
+            .demo-modal-mobile.active {
+                transform: translateY(0);
             }
+
+            .demo-modal-mobile::before {
+                content: '';
+                position: absolute;
+                top: 8px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 40px;
+                height: 4px;
+                background: #D1D5DB;
+                border-radius: 2px;
+            }
+        }
+
+        /* Spotlight Enhancement - Weniger aufdringlich */
+        .demo-spotlight-subtle {
+            position: fixed;
+            border: 2px solid #3B82F6;
+            border-radius: 8px;
+            background: rgba(59, 130, 246, 0.05);
+            pointer-events: none;
+            z-index: 45;
+            animation: gentle-glow 3s infinite;
+        }
+
+        @keyframes gentle-glow {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+                border-color: rgba(59, 130, 246, 0.6);
+            }
+            50% {
+                box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+                border-color: rgba(59, 130, 246, 1);
+            }
+        }
+
+        /* Background Overlay - Subtiler */
+        .demo-overlay-subtle {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(1px);
+            z-index: 40;
         }
     </style>
 </head>
@@ -619,154 +680,136 @@
 
                 const currentStep = this.state.demoSteps[this.state.demoStep];
                 const targetElement = document.querySelector(`[data-demo="${currentStep.target}"]`);
-                const modalPos = this.calculateModalPosition(targetElement);
 
                 return `
-                    <div class="fixed inset-0 bg-black bg-opacity-20 z-50 flex items-center justify-center">
-                        ${targetElement ? this.renderSpotlight(targetElement) : ''}
-
-                        <div class="demo-modal ${modalPos.position}" style="${this.getModalStyles(modalPos)}">
-                            <div class="bg-white rounded-xl max-w-sm w-full p-6 relative shadow-2xl border">
-                                <button onclick="app.exitDemo()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl">✕</button>
-                                <div class="mb-4">
-                                    <div class="text-3xl mb-3 text-center">${currentStep.icon || '🎯'}</div>
-                                    <h3 class="text-lg font-semibold text-gray-800 mb-2">${currentStep.title}</h3>
-                                    <p class="text-gray-600 text-sm leading-relaxed">${currentStep.text}</p>
-                                </div>
-                                <div class="flex justify-between items-center pt-4 border-t border-gray-100">
-                                    <div class="text-xs text-gray-500">
-                                        ${this.state.demoStep + 1} / ${this.state.demoSteps.length}
-                                    </div>
-                                    <div class="flex gap-2">
-                                        ${this.state.demoStep > 0 ? `
-                                            <button onclick="app.prevDemoStep()" class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded">
-                                                Zurück
-                                            </button>
-                                        ` : ''}
-                                        <button onclick="app.nextDemoStep()" class="px-3 py-1.5 text-sm bg-blue-500 text-white rounded hover:bg-blue-600">
-                                            ${this.state.demoStep === this.state.demoSteps.length - 1 ? 'Fertig' : 'Weiter'}
-                                        </button>
-                                    </div>
-                                </div>
-                                ${this.renderModalArrow(modalPos.position)}
-                            </div>
-                        </div>
-                    </div>
-                    `;
+                    <div class="demo-overlay-subtle"></div>
+                    ${targetElement ? this.renderSpotlight(targetElement) : ''}
+                    ${this.renderDemoModal()}
+                `;
             }
 
             highlightDemoTarget() {
-                document.querySelectorAll('.demo-highlight').forEach(el => {
-                    el.classList.remove('demo-highlight', 'ring-4', 'ring-blue-400', 'ring-opacity-75');
-                });
-
                 if (!this.state.showDemoOverlay || !this.state.isDemo) return;
 
                 const currentStep = this.state.demoSteps[this.state.demoStep];
                 const target = document.querySelector(`[data-demo="${currentStep.target}"]`);
 
                 if (target) {
-                    target.classList.add('demo-highlight', 'ring-4', 'ring-blue-400', 'ring-opacity-75');
                     target.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
             }
 
             calculateModalPosition(targetElement) {
-                if (!targetElement) return { position: 'center' };
+                if (!targetElement) return { position: 'right', side: 'right' };
 
                 const rect = targetElement.getBoundingClientRect();
                 const viewport = { width: window.innerWidth, height: window.innerHeight };
 
-                const modalWidth = 400;
-                const modalHeight = 300;
+                // Mobile: Immer bottom sheet
+                if (viewport.width <= 768) {
+                    return { position: 'mobile', side: 'bottom' };
+                }
 
-                const spaces = {
-                    top: rect.top,
-                    bottom: viewport.height - rect.bottom,
-                    left: rect.left,
-                    right: viewport.width - rect.right
-                };
+                // Desktop: Bevorzuge rechts, dann links
+                const spaceRight = viewport.width - rect.right;
+                const spaceLeft = rect.left;
 
-                if (spaces.right >= modalWidth + 20) {
-                    return { position: 'right', offset: { top: Math.max(20, rect.top - 50) } };
-                } else if (spaces.left >= modalWidth + 20) {
-                    return { position: 'left', offset: { top: Math.max(20, rect.top - 50) } };
-                } else if (spaces.bottom >= modalHeight + 20) {
-                    return { position: 'bottom', offset: { left: Math.max(20, rect.left - 100) } };
-                } else if (spaces.top >= modalHeight + 20) {
-                    return { position: 'top', offset: { left: Math.max(20, rect.left - 100) } };
+                if (spaceRight >= 360) {
+                    return { position: 'right', side: 'right' };
+                } else if (spaceLeft >= 360) {
+                    return { position: 'left', side: 'left' };
                 } else {
-                    return { position: 'center' };
+                    return { position: 'right', side: 'right' }; // Fallback
                 }
             }
 
-            getModalStyles(modalPos) {
-                const styles = [];
+            renderConnectionLine(targetElement, modalPosition) {
+                if (!targetElement || modalPosition.position === 'mobile') return '';
 
-                switch(modalPos.position) {
-                    case 'right':
-                        styles.push(`position: fixed`);
-                        styles.push(`left: auto`);
-                        styles.push(`right: 20px`);
-                        styles.push(`top: ${modalPos.offset.top}px`);
-                        break;
-                    case 'left':
-                        styles.push(`position: fixed`);
-                        styles.push(`left: 20px`);
-                        styles.push(`right: auto`);
-                        styles.push(`top: ${modalPos.offset.top}px`);
-                        break;
-                    case 'bottom':
-                        styles.push(`position: fixed`);
-                        styles.push(`top: auto`);
-                        styles.push(`bottom: 20px`);
-                        styles.push(`left: ${modalPos.offset.left}px`);
-                        break;
-                    case 'top':
-                        styles.push(`position: fixed`);
-                        styles.push(`top: 20px`);
-                        styles.push(`bottom: auto`);
-                        styles.push(`left: ${modalPos.offset.left}px`);
-                        break;
-                    default:
-                        styles.push(`position: relative`);
-                        styles.push(`margin: auto`);
-                }
+                const rect = targetElement.getBoundingClientRect();
+                const modalX = modalPosition.side === 'right'
+                    ? window.innerWidth - 340
+                    : 340;
+                const targetCenterX = rect.left + rect.width / 2;
+                const targetCenterY = rect.top + rect.height / 2;
 
-                return styles.join('; ');
+                const lineWidth = Math.abs(modalX - targetCenterX);
+                const lineLeft = Math.min(modalX, targetCenterX);
+
+                return `
+                    <div class="demo-connection-line fade-line" style="
+                        top: ${targetCenterY}px;
+                        left: ${lineLeft}px;
+                        width: ${lineWidth}px;
+                    "></div>
+                `;
             }
+
+            renderDemoModal() {
+                const currentStep = this.state.demoSteps[this.state.demoStep];
+                const targetElement = document.querySelector(`[data-demo="${currentStep.target}"]`);
+                const modalPos = this.calculateModalPosition(targetElement);
+
+                const isMobile = window.innerWidth <= 768;
+                const modalClass = isMobile ? 'demo-modal-mobile' : `demo-modal-desktop demo-modal-${modalPos.side}`;
+
+                return `
+                    ${this.renderConnectionLine(targetElement, modalPos)}
+
+                    <div class="${modalClass} ${this.state.showDemoOverlay ? 'active' : ''}">
+                        <div class="p-4">
+                            ${isMobile ? `
+                                <div class="text-center mb-3">
+                                    <div class="inline-flex items-center gap-2 text-xs text-gray-500 bg-gray-100 rounded-full px-3 py-1">
+                                        <span>${currentStep.icon || '🎯'}</span>
+                                        <span>${this.state.demoStep + 1}/${this.state.demoSteps.length}</span>
+                                    </div>
+                                </div>
+                            ` : `
+                                <div class="flex justify-between items-center mb-3">
+                                    <span class="text-2xl">${currentStep.icon || '🎯'}</span>
+                                    <button onclick="app.exitDemo()" class="text-gray-400 hover:text-gray-600">✕</button>
+                                </div>
+                            `}
+
+                            <h3 class="font-semibold text-gray-800 mb-2 text-sm">${currentStep.title}</h3>
+                            <p class="text-gray-600 text-xs leading-relaxed mb-4">${currentStep.text}</p>
+
+                            <div class="flex justify-between items-center">
+                                <div class="text-xs text-gray-400">
+                                    ${this.state.demoStep + 1} / ${this.state.demoSteps.length}
+                                </div>
+                                <div class="flex gap-2">
+                                    ${this.state.demoStep > 0 ? `
+                                        <button onclick="app.prevDemoStep()" class="px-2 py-1 text-xs text-gray-600 border rounded">
+                                            ←
+                                        </button>
+                                    ` : ''}
+                                    <button onclick="app.nextDemoStep()" class="px-3 py-1 text-xs bg-blue-500 text-white rounded">
+                                        ${this.state.demoStep === this.state.demoSteps.length - 1 ? 'Fertig' : 'Weiter →'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+
 
             renderSpotlight(targetElement) {
                 const rect = targetElement.getBoundingClientRect();
 
                 return `
-                    <div class="spotlight-effect" style="
-                        position: fixed;
+                    <div class="demo-spotlight-subtle" style="
                         top: ${rect.top - 8}px;
                         left: ${rect.left - 8}px;
                         width: ${rect.width + 16}px;
                         height: ${rect.height + 16}px;
-                        border: 3px solid #3B82F6;
-                        border-radius: 8px;
-                        background: rgba(59, 130, 246, 0.1);
-                        pointer-events: none;
-                        z-index: 45;
-                        animation: spotlight-pulse 2s infinite;
                     "></div>
                 `;
             }
 
-            renderModalArrow(position) {
-                const arrows = {
-                    right: `<div class="modal-arrow modal-arrow-left"></div>`,
-                    left: `<div class="modal-arrow modal-arrow-right"></div>`,
-                    bottom: `<div class="modal-arrow modal-arrow-top"></div>`,
-                    top: `<div class="modal-arrow modal-arrow-bottom"></div>`,
-                    center: ''
-                };
-
-                return arrows[position] || '';
-            }
 
             renderSkeletonCat() {
                 return `
