@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Behandlungs-Tracker</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="Behandlungs-Tracker für Katzen - 84 Tage Medikamenten-Therapie">
+    <meta name="theme-color" content="#3B82F6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Behandlungs-Tracker">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        /* Mobile optimizations */
+        @media (max-width: 640px) {
+            .mobile-compact {
+                padding: 1rem;
+                margin-bottom: 1rem;
+            }
+            
+            .mobile-input {
+                font-size: 16px; /* Prevents zoom on iOS */
+                padding: 0.75rem;
+            }
+            
+            .mobile-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .mobile-button {
+                padding: 0.75rem 1rem;
+                font-size: 0.875rem;
+            }
+        }
+
+        /* Better touch targets */
+        button, input, select, textarea {
+            min-height: 44px;
+        }
+        
+        /* PWA install button */
+        .install-prompt {
+            display: none;
+        }
+        
+        .install-prompt.show {
+            display: flex;
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+    <script>
+        // Simple PWA manifest
+        const manifest = {
+            "name": "Behandlungs-Tracker",
+            "short_name": "Behandlung",
+            "start_url": "./",
+            "display": "standalone",
+            "theme_color": "#3B82F6",
+            "background_color": "#FBFDFF",
+            "icons": [
+                {
+                    "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23EF4444'%3E%3Cpath d='m12 21.35-.5-.5c-6-5.5-10-9.17-10-13.65 0-3.3 2.69-6 6-6 2.14 0 4.16 1.08 5.26 2.86C13.84 4.08 15.86 3 18 3c3.31 0 6 2.7 6 6 0 4.48-4 8.15-10 13.65L12 21.35Z'/%3E%3C/svg%3E",
+                    "sizes": "192x192",
+                    "type": "image/svg+xml"
+                }
+            ]
+        };
+
+        const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+        const manifestURL = URL.createObjectURL(blob);
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = manifestURL;
+        document.head.appendChild(link);
+
+        // Behandlungs-Tracker App
+        class TreatmentTracker {
+            constructor() {
+                this.state = {
+                    startDate: localStorage.getItem('treatment-startDate') || '',
+                    catWeight: localStorage.getItem('treatment-catWeight') || '',
+                    fipType: localStorage.getItem('treatment-medicationType') || '',
+                    concentration: localStorage.getItem('treatment-concentration') || '',
+                    customDose: localStorage.getItem('treatment-customDose') || '',
+                    reminderTime: localStorage.getItem('treatment-reminderTime') || '19:30',
+                    treatmentData: JSON.parse(localStorage.getItem('treatment-progress') || '{}'),
+                    diary: JSON.parse(localStorage.getItem('treatment-diary') || '{}'),
+                    notificationsEnabled: false,
+                    isDemo: false,
+                    demoStep: 0,
+                    editingWeight: false,
+                    editingDiary: '',
+                    showFAQ: false,
+                    currentTime: new Date()
+                };
+                
+                this.demoData = {
+                    catWeight: '3.7',
+                    fipType: 'ocular',
+                    concentration: '16',
+                    startDate: new Date().toISOString().split('T')[0],
+                    reminderTime: '19:30'
+                };
+
+                this.init();
+            }
+
+            init() {
+                this.render();
+                this.setupPWA();
+                
+                // Update time every minute
+                setInterval(() => {
+                    this.state.currentTime = new Date();
+                }, 60000);
+            }
+
+            setupPWA() {
+                let deferredPrompt;
+                
+                window.addEventListener('beforeinstallprompt', (e) => {
+                    e.preventDefault();
+                    deferredPrompt = e;
+                    const installBtn = document.querySelector('.install-prompt');
+                    if (installBtn) {
+                        installBtn.classList.add('show');
+                    }
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (e.target.closest('.install-app-btn') && deferredPrompt) {
+                        deferredPrompt.prompt();
+                        deferredPrompt.userChoice.then(() => {
+                            deferredPrompt = null;
+                            const installBtn = document.querySelector('.install-prompt');
+                            if (installBtn) {
+                                installBtn.classList.remove('show');
+                            }
+                        });
+                    }
+                });
+
+                // Show manual install hint on iOS Safari
+                if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream) {
+                    document.addEventListener('click', (e) => {
+                        if (e.target.closest('.install-app-btn')) {
+                            alert('Um die App zu installieren:\nTeilen-Button → "Zum Home-Bildschirm hinzufügen"');
+                        }
+                    });
+                }
+            }
+
+            calculateDose() {
+                if (!this.state.catWeight || !this.state.fipType || !this.state.concentration) return null;
+                
+                const dosageMap = {
+                    'neuro': 10,
+                    'ocular': 8,
+                    'wet_dry': 6
+                };
+                
+                const dosage = dosageMap[this.state.fipType];
+                const rawDose = (parseFloat(this.state.catWeight) * dosage) / parseFloat(this.state.concentration);
+                return Math.ceil(rawDose * 10) / 10;
+            }
+
+            generateTreatmentDays(start) {
+                const days = [];
+                const startDay = new Date(start);
+                for (let i = 0; i < 84; i++) {
+                    const day = new Date(startDay);
+                    day.setDate(startDay.getDate() + i);
+                    const dayNumber = i + 1;
+                    
+                    days.push({
+                        day: dayNumber,
+                        date: day.toISOString().split('T')[0],
+                        dateObj: day,
+                        completed: this.state.treatmentData[day.toISOString().split('T')[0]] || false,
+                        isMilestone: this.getMilestone(dayNumber)
+                    });
+                }
+                return days;
+            }
+
+            getMilestone(day) {
+                if (day >= 28 && day <= 30) return { type: 'blood1', text: 'Erstes Kontroll-Blutbild', icon: '🩸' };
+                if (day >= 54 && day <= 56) return { type: 'blood2', text: 'Zweites Kontroll-Blutbild', icon: '🩸' };
+                if (day >= 60 && day <= 70) return { type: 'surgery', text: 'Ggf. weitere Eingriffe', icon: '🏥' };
+                if (day >= 77 && day <= 81) return { type: 'final', text: 'Abschluss-Untersuchung & Therapieende!', icon: '🎉' };
+                if (day === 84) return { type: 'complete', text: 'Behandlung abgeschlossen!', icon: '🏆' };
+                return null;
+            }
+
+            startDemo() {
+                this.state.isDemo = true;
+                this.state.demoStep = 0;
+                Object.assign(this.state, this.demoData);
+                this.render();
+            }
+
+            nextDemoStep() {
+                this.state.demoStep++;
+                this.render();
+            }
+
+            exitDemo() {
+                this.state.isDemo = false;
+                this.state.demoStep = 0;
+                this.state.catWeight = '';
+                this.state.fipType = '';
+                this.state.concentration = '';
+                this.state.startDate = '';
+                this.state.customDose = '';
+                this.state.treatmentData = {};
+                this.state.diary = {};
+                this.render();
+            }
+
+            enableNotifications() {
+                if ('Notification' in window) {
+                    Notification.requestPermission().then((permission) => {
+                        this.state.notificationsEnabled = permission === 'granted';
+                        this.render();
+                        
+                        if (permission === 'granted') {
+                            const checkReminder = () => {
+                                if (!this.state.startDate) return;
+                                
+                                const now = new Date();
+                                const [hours, minutes] = this.state.reminderTime.split(':');
+                                const reminderDate = new Date();
+                                reminderDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+                                
+                                const timeDiff = Math.abs(now - reminderDate);
+                                if (timeDiff < 60000) {
+                                    const today = now.toISOString().split('T')[0];
+                                    const treatmentDays = this.generateTreatmentDays(this.state.startDate);
+                                    const todayTreatment = treatmentDays.find(day => day.date === today);
+                                    
+                                    if (todayTreatment && !todayTreatment.completed) {
+                                        new Notification('Behandlungs-Erinnerung! 💉', {
+                                            body: `Zeit für die tägliche Medikation (${this.calculateDose()} ml)`
+                                        });
+                                    }
+                                }
+                            };
+                            
+                            setInterval(checkReminder, 60000);
+                        }
+                    });
+                }
+            }
+
+            toggleTreatment(date) {
+                this.state.treatmentData[date] = !this.state.treatmentData[date];
+                this.saveProgress();
+                this.render();
+            }
+
+            updateDiary(date, note) {
+                this.state.diary[date] = note;
+                this.saveProgress();
+            }
+
+            updateState(key, value) {
+                this.state[key] = value;
+                
+                // Save important settings to localStorage
+                const settingsKeys = ['startDate', 'catWeight', 'fipType', 'concentration', 'customDose', 'reminderTime'];
+                if (settingsKeys.includes(key)) {
+                    const storageKey = key === 'fipType' ? 'treatment-medicationType' : `treatment-${key}`;
+                    localStorage.setItem(storageKey, value);
+                }
+                
+                this.render();
+            }
+
+            saveProgress() {
+                localStorage.setItem('treatment-progress', JSON.stringify(this.state.treatmentData));
+                localStorage.setItem('treatment-diary', JSON.stringify(this.state.diary));
+            }
+
+            formatTimeUntil(milliseconds) {
+                if (milliseconds <= 0) return "Zeit ist vorbei";
+                const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+                const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+                return `${hours}h ${minutes}m bis ${this.state.reminderTime}`;
+            }
+
+            renderFAQ() {
+                const faqs = [
+                    {
+                        question: "Welche Medikamente können parallel gegeben werden?",
+                        answer: "Bitte konsultiere immer deinen Admin bevor du zusätzliche Medikamente gibst. Einige Antibiotika und andere Wirkstoffe können Wechselwirkungen haben."
+                    },
+                    {
+                        question: "Was mache ich bei Nebenwirkungen oder Problemen?",
+                        answer: "Kontaktiere sofort deinen Admin oder die Support Community. Bei anderen Medikamenten immer vorher nachfragen!"
+                    },
+                    {
+                        question: "Wie oft muss ich meine Katze wiegen?",
+                        answer: "Mindestens 1x wöchentlich wiegen und die Dosis neu berechnen. Bei Gewichtsabnahme die Dosis NICHT reduzieren!"
+                    },
+                    {
+                        question: "Was passiert wenn ich eine Behandlung vergesse?",
+                        answer: "Kontaktiere deinen Admin."
+                    },
+                    {
+                        question: "Wie lange dauert die Behandlung?",
+                        answer: "Die Standardbehandlung dauert 84 Tage. Diese Dauer sollte eingehalten werden, auch wenn die Katze sich besser fühlt."
+                    },
+                    {
+                        question: "Welche Begleitmedikamente sind sinnvoll?",
+                        answer: "Häufig werden B12, Leberschutz und Omega-3 empfohlen. Besprich dies mit deinem Admin."
+                    }
+                ];
+
+                return `
+                    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
+                        <div class="bg-white rounded-xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col">
+                            <div class="p-6 border-b border-gray-200 flex-shrink-0">
+                                <div class="flex justify-between items-center">
+                                    <h2 class="text-2xl font-bold text-gray-800">FAQ - Häufige Fragen</h2>
+                                    <button onclick="app.updateState('showFAQ', false)" class="text-gray-500 hover:text-gray-700 text-xl p-2">
+                                        ✕
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="p-6 space-y-6 overflow-y-auto flex-1">
+                                ${faqs.map((faq, index) => `
+                                    <div class="border-b border-gray-100 pb-4">
+                                        <h3 class="font-semibold text-gray-800 mb-3">${faq.question}</h3>
+                                        <p class="text-gray-600">${faq.answer}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            render() {
+                const dailyDose = this.state.customDose ? parseFloat(this.state.customDose) : this.calculateDose();
+                const treatmentDays = this.state.startDate ? this.generateTreatmentDays(this.state.startDate) : [];
+                const completedCount = Object.values(this.state.treatmentData).filter(Boolean).length;
+                const progressPercentage = treatmentDays.length > 0 ? (completedCount / 84) * 100 : 0;
+                
+                const today = new Date().toISOString().split('T')[0];
+                const todayTreatment = treatmentDays.find(day => day.date === today);
+                
+                let todayStatus = null;
+                if (todayTreatment) {
+                    const now = new Date();
+                    const [hours, minutes] = this.state.reminderTime.split(':');
+                    const targetTime = new Date();
+                    targetTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+                    
+                    todayStatus = {
+                        ...todayTreatment,
+                        isToday: true,
+                        timeUntil: targetTime - now,
+                        isPastTime: now >= targetTime
+                    };
+                }
+
+                const upcomingMilestone = treatmentDays.find(day => day.date >= today && day.isMilestone);
+
+                document.getElementById('app').innerHTML = `
+                    ${this.state.showFAQ ? this.renderFAQ() : ''}
+                    
+                    <div class="max-w-4xl mx-auto p-4 md:p-6 bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen">
+                        <div class="bg-white rounded-xl shadow-lg mobile-compact md:p-6 mb-6">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+                                <div class="flex items-center gap-3">
+                                    <svg class="text-red-500 w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="m12 21.35-.5-.5c-6-5.5-10-9.17-10-13.65 0-3.3 2.69-6 6-6 2.14 0 4.16 1.08 5.26 2.86C13.84 4.08 15.86 3 18 3c3.31 0 6 2.7 6 6 0 4.48-4 8.15-10 13.65L12 21.35Z"/>
+                                    </svg>
+                                    <div>
+                                        <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Behandlungs-Tracker</h1>
+                                        <p class="text-sm text-gray-600">84 Tage Medikamenten-Therapie</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <div class="install-prompt items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors cursor-pointer install-app-btn">
+                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                                        </svg>
+                                        <span>App installieren</span>
+                                    </div>
+                                    
+                                    ${!this.state.startDate ? `
+                                        <button onclick="app.startDemo()" class="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors">
+                                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M8 5v14l11-7z"/>
+                                            </svg>
+                                            Demo starten
+                                        </button>
+                                    ` : ''}
+                                    
+                                    <button onclick="app.updateState('showFAQ', true)" class="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+                                        </svg>
+                                        FAQ
+                                    </button>
+                                </div>
+                            </div>
+
+                            ${!this.state.startDate && !this.state.isDemo ? `
+                                <div class="space-y-6">
+                                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                                        <div class="flex items-center gap-3 mb-4">
+                                            <svg class="text-blue-600 w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/>
+                                            </svg>
+                                            <h2 class="text-xl font-semibold text-blue-800">Medikamenten-Dosisberechnung</h2>
+                                        </div>
+                                        
+                                        <div class="mobile-grid md:grid-cols-2 gap-4 mb-4">
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                                    Gewicht der Katze (kg)
+                                                </label>
+                                                <input type="number" step="0.1" value="${this.state.catWeight}" 
+                                                    onchange="app.updateState('catWeight', this.value)"
+                                                    class="w-full border border-gray-300 rounded-md px-3 py-2 mobile-input" placeholder="z.B. 3.7">
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-2">Behandlungsart</label>
+                                                <select value="${this.state.fipType}" onchange="app.updateState('fipType', this.value)"
+                                                    class="w-full border border-gray-300 rounded-md px-3 py-2 mobile-input">
+                                                    <option value="">Wählen...</option>
+                                                    <option value="neuro" ${this.state.fipType === 'neuro' ? 'selected' : ''}>Neurologisch (10 mg/kg)</option>
+                                                    <option value="ocular" ${this.state.fipType === 'ocular' ? 'selected' : ''}>Okulär (8 mg/kg)</option>
+                                                    <option value="wet_dry" ${this.state.fipType === 'wet_dry' ? 'selected' : ''}>Standard (6 mg/kg)</option>
+                                                </select>
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                                    Konzentration (mg/ml)
+                                                </label>
+                                                <input type="number" value="${this.state.concentration}" 
+                                                    onchange="app.updateState('concentration', this.value)"
+                                                    class="w-full border border-gray-300 rounded-md px-3 py-2 mobile-input" placeholder="z.B. 16">
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-2">Startdatum</label>
+                                                <input type="date" value="${this.state.startDate}" 
+                                                    onchange="app.updateState('startDate', this.value)"
+                                                    class="w-full border border-gray-300 rounded-md px-3 py-2 mobile-input">
+                                            </div>
+                                        </div>
+
+                                        ${dailyDose ? `
+                                            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                                <div class="flex items-center gap-3">
+                                                    <svg class="text-green-600 w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                                        <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
+                                                    </svg>
+                                                    <div>
+                                                        <p class="text-lg font-bold text-green-800">Tägliche Dosis: ${dailyDose} ml</p>
+                                                        <p class="text-sm text-gray-600">
+                                                            ${this.state.catWeight} kg × ${this.state.fipType === 'neuro' ? '10' : this.state.fipType === 'ocular' ? '8' : '6'} mg/kg ÷ ${this.state.concentration} mg/ml = ${dailyDose} ml
+                                                        </p>
+                                                        <p class="text-xs text-gray-500 mt-1">💡 Automatisch auf 1 Nachkommastelle aufgerundet</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            ` : ''}
+
+                            ${(this.state.startDate || this.state.isDemo) && dailyDose ? `
+                                <!-- Weight & Dose Management -->
+                                <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                        <div class="flex flex-wrap items-center gap-4">
+                                            <div class="flex items-center gap-2">
+                                                <svg class="text-blue-600 w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M12 3c4.97 0 9 4.03 9 9s-4.03 9-9 9-9-4.03-9-9 4.03-9 9-9M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4m0 6c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/>
+                                                </svg>
+                                                <span class="font-medium">Gewicht:</span>
+                                                ${this.state.editingWeight ? `
+                                                    <div class="flex items-center gap-2">
+                                                        <input type="number" step="0.1" value="${this.state.catWeight}"
+                                                            onchange="app.updateState('catWeight', this.value)"
+                                                            class="w-20 border border-gray-300 rounded px-2 py-1 text-sm">
+                                                        <button onclick="app.updateState('editingWeight', false)" class="text-green-600 hover:text-green-800">
+                                                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                                                <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                ` : `
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="font-bold">${this.state.catWeight} kg</span>
+                                                        <button onclick="app.updateState('editingWeight', true)" class="text-blue-600 hover:text-blue-800">
+                                                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                                                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                `}
+                                            </div>
+                                            
+                                            <div class="flex items-center gap-2">
+                                                <svg class="text-green-600 w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
+                                                </svg>
+                                                <span class="font-medium">Dosis:</span>
+                                                <span class="font-bold text-green-700">${dailyDose} ml</span>
+                                                ${this.state.customDose ? '<span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Angepasst</span>' : ''}
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="flex items-center gap-2">
+                                            <input type="number" step="0.1" placeholder="Custom" value="${this.state.customDose}"
+                                                onchange="app.updateState('customDose', this.value)"
+                                                class="w-20 border border-gray-300 rounded px-2 py-1 text-sm">
+                                            <span class="text-xs text-gray-500">ml</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Reminder Settings -->
+                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                        <div class="flex items-center gap-3">
+                                            <svg class="text-yellow-600 w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+                                            </svg>
+                                            <div>
+                                                <h3 class="font-semibold">Erinnerungen</h3>
+                                                <p class="text-sm text-gray-600">
+                                                    ${this.state.notificationsEnabled ? 'Aktiviert' : 'Benachrichtigungen aktivieren'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-3">
+                                            <input type="time" value="${this.state.reminderTime}" 
+                                                onchange="app.updateState('reminderTime', this.value)"
+                                                class="border border-gray-300 rounded px-2 py-1 text-sm mobile-input">
+                                            ${!this.state.notificationsEnabled ? `
+                                                <button onclick="app.enableNotifications()" class="px-3 py-1 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600 mobile-button">
+                                                    Aktivieren
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Progress Overview -->
+                                <div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-6 mb-6">
+                                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Behandlungsfortschritt</h2>
+                                    
+                                    <div class="flex items-center gap-4 mb-3">
+                                        <div class="flex-1">
+                                            <div class="bg-gray-200 rounded-full h-4">
+                                                <div class="bg-gradient-to-r from-green-400 to-blue-500 h-4 rounded-full transition-all duration-500"
+                                                    style="width: ${progressPercentage}%"></div>
+                                            </div>
+                                        </div>
+                                        <span class="font-bold text-xl">${completedCount}/84</span>
+                                    </div>
+                                    
+                                    <p class="text-sm text-gray-600 mb-3">
+                                        ${Math.round(progressPercentage)}% abgeschlossen • ${84 - completedCount} Tage verbleibend
+                                    </p>
+
+                                    ${upcomingMilestone ? `
+                                        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                            <div class="flex items-center gap-2">
+                                                <svg class="text-amber-600 w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
+                                                </svg>
+                                                <p class="text-sm font-medium text-amber-800">
+                                                    Nächster Meilenstein: ${upcomingMilestone.isMilestone.icon} ${upcomingMilestone.isMilestone.text} (Tag ${upcomingMilestone.day})
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+
+                                ${todayStatus ? `
+                                    <!-- Today's Status -->
+                                    <div class="rounded-lg p-4 mb-6 ${
+                                        todayStatus.completed 
+                                            ? 'bg-green-50 border border-green-200' 
+                                            : todayStatus.isMilestone
+                                            ? 'bg-purple-50 border border-purple-200'
+                                            : 'bg-yellow-50 border border-yellow-200'
+                                    }">
+                                        <div class="flex flex-col md:flex-row md:items-center justify-between mb-3 gap-4">
+                                            <div class="flex items-center gap-3">
+                                                <svg class="w-5 h-5 ${
+                                                    todayStatus.completed ? 'text-green-600' : 
+                                                    todayStatus.isMilestone ? 'text-purple-600' : 'text-yellow-600'
+                                                }" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/>
+                                                    <path d="M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+                                                </svg>
+                                                <div>
+                                                    <h3 class="font-semibold flex items-center gap-2">
+                                                        Heute - Tag ${todayStatus.day}
+                                                        ${todayStatus.isMilestone ? `<span class="text-lg">${todayStatus.isMilestone.icon}</span>` : ''}
+                                                    </h3>
+                                                    <p class="text-sm text-gray-600">
+                                                        ${todayStatus.completed 
+                                                            ? '✅ Bereits behandelt!' 
+                                                            : `⏰ ${this.formatTimeUntil(todayStatus.timeUntil)} • ${dailyDose} ml`
+                                                        }
+                                                    </p>
+                                                    ${todayStatus.isMilestone ? `
+                                                        <p class="text-xs font-medium text-purple-700 mt-1">
+                                                            🎯 ${todayStatus.isMilestone.text}
+                                                        </p>
+                                                    ` : ''}
+                                                </div>
+                                            </div>
+                                            <button onclick="app.toggleTreatment('${todayStatus.date}')" class="px-4 py-2 rounded-md font-medium transition-colors mobile-button ${
+                                                todayStatus.completed
+                                                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                    : 'bg-blue-500 text-white hover:bg-blue-600'
+                                            }">
+                                                ${todayStatus.completed ? 'Rückgängig' : 'Behandelt!'}
+                                            </button>
+                                        </div>
+
+                                        <!-- Today's Diary -->
+                                        <div class="bg-white rounded-lg p-3 border">
+                                            <div class="flex items-center gap-2 mb-2">
+                                                <svg class="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+                                                </svg>
+                                                <span class="text-sm font-medium">Tagebuch heute:</span>
+                                            </div>
+                                            ${this.state.editingDiary === todayStatus.date ? `
+                                                <div class="flex gap-2">
+                                                    <textarea value="${this.state.diary[todayStatus.date] || ''}" 
+                                                        onchange="app.updateDiary('${todayStatus.date}', this.value)"
+                                                        placeholder="Wie geht es der Katze heute? Verhalten, Appetit, etc..."
+                                                        class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm mobile-input" rows="2"></textarea>
+                                                    <button onclick="app.updateState('editingDiary', '')" class="px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 mobile-button">
+                                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                                            <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            ` : `
+                                                <div onclick="app.updateState('editingDiary', '${todayStatus.date}')" 
+                                                    class="text-sm text-gray-600 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                                                    ${this.state.diary[todayStatus.date] || 'Notiz hinzufügen... 📝'}
+                                                </div>
+                                            `}
+                                        </div>
+                                    </div>
+                                ` : ''}
+
+                                <!-- Treatment Calendar -->
+                                <div class="bg-white rounded-lg border border-gray-200 p-4">
+                                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Behandlungskalender</h2>
+                                    <div class="grid grid-cols-5 sm:grid-cols-7 gap-2 max-h-96 overflow-y-auto">
+                                        ${treatmentDays.map((day) => {
+                                            const isToday = day.date === today;
+                                            const isPast = day.dateObj < new Date();
+                                            
+                                            return `
+                                                <button onclick="app.toggleTreatment('${day.date}')" class="p-2 md:p-3 rounded-lg border transition-all duration-200 relative text-xs ${
+                                                    day.completed
+                                                        ? 'bg-green-100 border-green-300 text-green-800'
+                                                        : isToday
+                                                        ? 'bg-yellow-100 border-yellow-300 text-yellow-800 ring-2 ring-yellow-400'
+                                                        : day.isMilestone
+                                                        ? 'bg-purple-100 border-purple-300 text-purple-800'
+                                                        : isPast
+                                                        ? 'bg-red-50 border-red-200 text-red-600'
+                                                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                                                }">
+                                                    ${day.isMilestone ? `<div class="absolute -top-1 -right-1 text-xs">${day.isMilestone.icon}</div>` : ''}
+                                                    ${this.state.diary[day.date] ? '<div class="absolute -top-1 -left-1 text-xs">📝</div>' : ''}
+                                                    <div class="flex items-center justify-center mb-1">
+                                                        ${day.completed ? 
+                                                            '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>' :
+                                                            '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/></svg>'
+                                                        }
+                                                    </div>
+                                                    <div class="font-semibold">Tag ${day.day}</div>
+                                                    <div class="text-xs">
+                                                        ${day.dateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                                                    </div>
+                                                </button>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                </div>
+
+                                <!-- Important Reminders -->
+                                <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-6">
+                                    <h3 class="font-semibold text-amber-800 mb-2">Wichtige Erinnerungen</h3>
+                                    <ul class="text-sm text-amber-700 space-y-1">
+                                        <li>• Täglich um ${this.state.reminderTime} (±30min früher, ±15min später OK)</li>
+                                        <li>• Wöchentlich wiegen & Dosis neu berechnen</li>
+                                        <li>• Injektionsstelle täglich wechseln (4 Stellen verfügbar)</li>
+                                        <li>• Bei Gewichtsabnahme: Dosis NICHT reduzieren!</li>
+                                        <li>• Begleitmedikamente immer mit Admin absprechen</li>
+                                    </ul>
+                                </div>
+
+                                <div class="mt-6 text-center">
+                                    <button onclick="app.${this.state.isDemo ? 'exitDemo' : 'resetApp'}()" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 underline">
+                                        ${this.state.isDemo ? 'Demo beenden' : 'Behandlung zurücksetzen'}
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+
+            resetApp() {
+                this.state.startDate = '';
+                this.state.treatmentData = {};
+                this.state.diary = {};
+                this.state.catWeight = '';
+                this.state.fipType = '';
+                this.state.concentration = '';
+                this.state.customDose = '';
+                
+                // Clear all localStorage
+                localStorage.removeItem('treatment-startDate');
+                localStorage.removeItem('treatment-catWeight');
+                localStorage.removeItem('treatment-medicationType');
+                localStorage.removeItem('treatment-concentration');
+                localStorage.removeItem('treatment-customDose');
+                localStorage.removeItem('treatment-reminderTime');
+                localStorage.removeItem('treatment-progress');
+                localStorage.removeItem('treatment-diary');
+                
+                this.render();
+            }
+        }
+
+        // Initialize app
+        const app = new TreatmentTracker();
+    </script>
+</body>
+</html>
