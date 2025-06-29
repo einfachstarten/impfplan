@@ -532,6 +532,8 @@
             }
 
             renderFAQ() {
+                if (!this.state.showFAQ) return '';
+
                 const faqs = [
                     {
                         question: "Welche Medikamente können parallel gegeben werden?",
@@ -609,7 +611,6 @@
                             </div>
                         </div>
                     </div>
-                    ` : ''}
                 `;
             }
 
