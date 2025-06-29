@@ -33,8 +33,10 @@
             }
             
             .mobile-input {
-                font-size: 16px; /* Prevents zoom on iOS */
+                font-size: 16px !important; /* Prevents zoom on iOS */
                 padding: 0.75rem;
+                -webkit-appearance: none;
+                border-radius: 6px;
             }
             
             .mobile-grid {
@@ -302,6 +304,101 @@
             background: rgba(0, 0, 0, 0.1);
             backdrop-filter: blur(1px);
             z-index: 40;
+        }
+
+        /* Enhanced Slider Styles */
+        .weight-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: linear-gradient(to right,
+                #FEE2E2 0%,
+                #FEF3C7 20%,
+                #D1FAE5 50%,
+                #DBEAFE 80%,
+                #FEE2E2 100%
+            );
+            outline: none;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .weight-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #3B82F6;
+            cursor: pointer;
+            border: 3px solid white;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s ease;
+        }
+
+        .weight-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .weight-slider::-webkit-slider-thumb:active {
+            transform: scale(1.2);
+            background: #2563EB;
+        }
+
+        .weight-slider::-moz-range-thumb {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #3B82F6;
+            cursor: pointer;
+            border: 3px solid white;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s ease;
+        }
+
+        .weight-slider::-moz-range-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .weight-slider::-moz-range-thumb:active {
+            transform: scale(1.2);
+            background: #2563EB;
+        }
+
+        @media (max-width: 640px) {
+            .weight-slider {
+                height: 8px;
+                padding: 12px 0;
+            }
+
+            .weight-slider::-webkit-slider-thumb,
+            .weight-slider::-moz-range-thumb {
+                width: 32px;
+                height: 32px;
+            }
+
+            .slider-container {
+                padding: 16px 8px;
+            }
+        }
+
+        .weight-slider:focus {
+            outline: 2px solid #3B82F6;
+            outline-offset: 2px;
+        }
+
+        .weight-slider:focus::-webkit-slider-thumb {
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+        }
+
+        .slider-container {
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
         }
     </style>
 </head>
@@ -616,6 +713,11 @@
                 }
                 
                 this.render();
+            }
+
+            updateWeight(value) {
+                const roundedValue = Math.round(parseFloat(value) * 10) / 10;
+                this.updateState('catWeight', roundedValue.toString());
             }
 
             saveProgress() {
@@ -1135,17 +1237,27 @@
 
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Gewicht * <span class="text-blue-600 font-semibold">${this.state.catWeight ? this.state.catWeight + ' kg' : ''}</span>
+                    Gewicht * 
+                    <span class="text-blue-600 font-semibold">${this.state.catWeight ? this.state.catWeight + ' kg' : ''}</span>
                 </label>
-                <div class="flex items-center gap-4">
-                    <span class="text-sm text-gray-500">0.5kg</span>
-                    <input type="range" min="0.5" max="15" step="0.1" value="${this.state.catWeight || 3.5}"
-                        oninput="app.updateState('catWeight', this.value)"
-                        class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider">
-                    <span class="text-sm text-gray-500">15kg</span>
-                    <input type="number" step="0.1" min="0.5" max="15" value="${this.state.catWeight}"
-                        onchange="app.updateState('catWeight', this.value)"
-                        class="w-20 border border-gray-300 rounded px-2 py-1 text-sm">
+                <div class="slider-container">
+                    <div class="flex items-center gap-4">
+                        <span class="text-sm text-gray-500 font-medium">0.5kg</span>
+                        <input type="range" min="0.5" max="15" step="0.1" value="${this.state.catWeight || 3.5}"
+                            oninput="app.updateWeight(this.value)"
+                            class="weight-slider flex-1">
+                        <span class="text-sm text-gray-500 font-medium">15kg</span>
+                        <input type="number" step="0.1" min="0.5" max="15" value="${this.state.catWeight}"
+                            onchange="app.updateState('catWeight', this.value)"
+                            class="w-20 border border-gray-300 rounded px-2 py-1 text-sm mobile-input">
+                    </div>
+                    <div class="mt-2 text-center">
+                        <div class="text-xs text-gray-500 flex justify-between">
+                            <span>Sehr leicht</span>
+                            <span>Ideal</span>
+                            <span>Schwer</span>
+                        </div>
+                    </div>
                 </div>
                 ${this.getWeightFeedback()}
             </div>
@@ -1802,7 +1914,7 @@ renderTreatmentStep() {
     }
     </script>
     <footer class="text-center text-sm text-gray-500 mt-4">
-      Version 1.0.20250629180000
+      Version 1.0.20250629200000
     </footer>
 </body>
 </html>

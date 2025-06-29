@@ -1,4 +1,4 @@
-const VERSION = '1.0.20250629172612';
+const VERSION = '1.0.20250629200000';
 const CACHE_NAME = `behandlung-tracker-${VERSION}`;
 const urlsToCache = [
   '/',
