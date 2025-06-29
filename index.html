@@ -1198,7 +1198,7 @@ renderTreatmentStep() {
                     <p class="text-sm text-center text-blue-600 font-medium">${type.dose}</p>
                     <p class="text-xs text-center text-gray-500 mt-2">${type.desc}</p>
                 </div>
-            ).join('')}
+            `).join('')}
         </div>
     </div>
 
@@ -1209,7 +1209,7 @@ renderTreatmentStep() {
                 <button onclick="app.updateState('concentration', '${conc}')" class="px-4 py-2 rounded-lg border-2 font-medium transition-all ${
                     this.state.concentration === conc ? 'border-blue-500 bg-blue-500 text-white' : 'border-gray-300 text-gray-700 hover:border-blue-300'
                 }">${conc} mg/ml</button>
-            ).join('')}
+            `).join('')}
             <div class="flex items-center gap-2">
                 <input type="number" placeholder="Custom" value="${this.state.concentration && !['15','16','20'].includes(this.state.concentration) ? this.state.concentration : ''}"
                     onchange="app.updateState('concentration', this.value)"
@@ -1324,7 +1324,7 @@ renderTreatmentStep() {
                         </div>
                         ${index < steps.length - 1 ? `<div class="flex-1 h-px bg-gray-200 mx-4"></div>` : ''}
                     </div>
-                ).join('')}
+                `).join('')}
             </div>
 
             <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
