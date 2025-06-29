@@ -88,6 +88,7 @@
                 this.state = {
                     startDate: localStorage.getItem('treatment-startDate') || '',
                     catWeight: localStorage.getItem('treatment-catWeight') || '',
+                    catName: localStorage.getItem('treatment-catName') || '',
                     fipType: localStorage.getItem('treatment-medicationType') || '',
                     concentration: localStorage.getItem('treatment-concentration') || '',
                     customDose: localStorage.getItem('treatment-customDose') || '',
@@ -104,6 +105,7 @@
                 };
                 
                 this.demoData = {
+                    catName: 'Mimi',
                     catWeight: '3.7',
                     fipType: 'ocular',
                     concentration: '16',
@@ -248,7 +250,7 @@
                                     const todayTreatment = treatmentDays.find(day => day.date === today);
                                     
                                     if (todayTreatment && !todayTreatment.completed) {
-                                        new Notification('Behandlungs-Erinnerung! 💉', {
+                                        new Notification(`${this.state.catName ? this.state.catName + ' - ' : ''}Behandlungs-Erinnerung! 💉`, {
                                             body: `Zeit für die tägliche Medikation (${this.calculateDose()} ml)`
                                         });
                                     }
@@ -276,7 +278,7 @@
                 this.state[key] = value;
                 
                 // Save important settings to localStorage
-                const settingsKeys = ['startDate', 'catWeight', 'fipType', 'concentration', 'customDose', 'reminderTime'];
+                const settingsKeys = ['startDate', 'catWeight', 'catName', 'fipType', 'concentration', 'customDose', 'reminderTime'];
                 if (settingsKeys.includes(key)) {
                     const storageKey = key === 'fipType' ? 'treatment-medicationType' : `treatment-${key}`;
                     localStorage.setItem(storageKey, value);
@@ -429,6 +431,15 @@
                                         </div>
                                         
                                         <div class="mobile-grid md:grid-cols-2 gap-4 mb-4">
+                                            <div class="col-span-full mb-4">
+                                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                                    🐱 Name der Katze
+                                                </label>
+                                                <input type="text" value="${this.state.catName}" 
+                                                    onchange="app.updateState('catName', this.value)"
+                                                    class="w-full border border-gray-300 rounded-md px-3 py-2 mobile-input" 
+                                                    placeholder="z.B. Mimi">
+                                            </div>
                                             <div>
                                                 <label class="block text-sm font-medium text-gray-700 mb-2">
                                                     Gewicht der Katze (kg)
@@ -567,7 +578,9 @@
 
                                 <!-- Progress Overview -->
                                 <div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-6 mb-6">
-                                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Behandlungsfortschritt</h2>
+                                    <h2 class="text-xl font-semibold text-gray-800 mb-4">
+                                        ${this.state.catName ? `${this.state.catName}s ` : ''}Behandlungsfortschritt
+                                    </h2>
                                     
                                     <div class="flex items-center gap-4 mb-3">
                                         <div class="flex-1">
@@ -617,7 +630,7 @@
                                                 </svg>
                                                 <div>
                                                     <h3 class="font-semibold flex items-center gap-2">
-                                                        Heute - Tag ${todayStatus.day}
+                                                        ${this.state.catName ? `${this.state.catName} - ` : ''}Tag ${todayStatus.day}
                                                         ${todayStatus.isMilestone ? `<span class="text-lg">${todayStatus.isMilestone.icon}</span>` : ''}
                                                     </h3>
                                                     <p class="text-sm text-gray-600">
@@ -741,10 +754,12 @@
                 this.state.fipType = '';
                 this.state.concentration = '';
                 this.state.customDose = '';
+                this.state.catName = '';
                 
                 // Clear all localStorage
                 localStorage.removeItem('treatment-startDate');
                 localStorage.removeItem('treatment-catWeight');
+                localStorage.removeItem('treatment-catName');
                 localStorage.removeItem('treatment-medicationType');
                 localStorage.removeItem('treatment-concentration');
                 localStorage.removeItem('treatment-customDose');
