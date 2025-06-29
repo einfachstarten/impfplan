@@ -1,8 +1,8 @@
-const CACHE_NAME = 'behandlung-tracker-v1';
+const CACHE_NAME = 'behandlung-tracker-v2';
 const urlsToCache = [
   '/',
   '/index.html',
-  'https://cdn.tailwindcss.com'
+  // External resources are not cached to avoid CORS issues
 ];
 
 self.addEventListener('install', (event) => {
