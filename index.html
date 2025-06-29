@@ -266,6 +266,62 @@
             0% { opacity: 0.6; }
             100% { opacity: 1; }
         }
+
+        /* Demo Overlay Enhancements */
+        .modal-arrow {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border: 8px solid transparent;
+        }
+
+        .modal-arrow-left {
+            left: -16px;
+            top: 50%;
+            transform: translateY(-50%);
+            border-right-color: white;
+        }
+
+        .modal-arrow-right {
+            right: -16px;
+            top: 50%;
+            transform: translateY(-50%);
+            border-left-color: white;
+        }
+
+        .modal-arrow-top {
+            top: -16px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-bottom-color: white;
+        }
+
+        .modal-arrow-bottom {
+            bottom: -16px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-top-color: white;
+        }
+
+        @keyframes spotlight-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            50% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+        }
+
+        @media (max-width: 768px) {
+            .demo-modal {
+                position: fixed !important;
+                bottom: 20px !important;
+                left: 20px !important;
+                right: 20px !important;
+                top: auto !important;
+                max-width: none !important;
+            }
+
+            .modal-arrow {
+                display: none;
+            }
+        }
     </style>
 </head>
 <body>
@@ -641,31 +697,41 @@
                 if (!this.state.showDemoOverlay || !this.state.isDemo) return '';
 
                 const currentStep = this.state.demoSteps[this.state.demoStep];
+                const targetElement = document.querySelector(`[data-demo="${currentStep.target}"]`);
+                const modalPos = this.calculateModalPosition(targetElement);
 
                 return `
-                    <div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                        <div class="bg-white rounded-xl max-w-md w-full p-6 relative">
-                            <button onclick="app.exitDemo()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700">✕</button>
-                            <div class="text-center mb-4">
-                                <div class="text-2xl mb-2">${currentStep.icon || '🎯'}</div>
-                                <h3 class="text-xl font-semibold text-gray-800">${currentStep.title}</h3>
-                                <p class="text-gray-600 mt-2">${currentStep.text}</p>
-                            </div>
-                            <div class="flex justify-between items-center mt-6">
-                                <div class="text-sm text-gray-500">
-                                    ${this.state.demoStep + 1} / ${this.state.demoSteps.length}
+                    <div class="fixed inset-0 bg-black bg-opacity-20 z-50 flex items-center justify-center">
+                        ${targetElement ? this.renderSpotlight(targetElement) : ''}
+
+                        <div class="demo-modal ${modalPos.position}" style="${this.getModalStyles(modalPos)}">
+                            <div class="bg-white rounded-xl max-w-sm w-full p-6 relative shadow-2xl border">
+                                <button onclick="app.exitDemo()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl">✕</button>
+                                <div class="mb-4">
+                                    <div class="text-3xl mb-3 text-center">${currentStep.icon || '🎯'}</div>
+                                    <h3 class="text-lg font-semibold text-gray-800 mb-2">${currentStep.title}</h3>
+                                    <p class="text-gray-600 text-sm leading-relaxed">${currentStep.text}</p>
                                 </div>
-                                <div class="flex gap-2">
-                                    ${this.state.demoStep > 0 ? `<button onclick="app.prevDemoStep()" class="px-4 py-2 text-gray-600 hover:text-gray-800">Zurück</button>` : ''}
-                                    <button onclick="app.nextDemoStep()" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
-                                        ${this.state.demoStep === this.state.demoSteps.length - 1 ? 'Fertig' : 'Weiter'}
-                                    </button>
+                                <div class="flex justify-between items-center pt-4 border-t border-gray-100">
+                                    <div class="text-xs text-gray-500">
+                                        ${this.state.demoStep + 1} / ${this.state.demoSteps.length}
+                                    </div>
+                                    <div class="flex gap-2">
+                                        ${this.state.demoStep > 0 ? `
+                                            <button onclick="app.prevDemoStep()" class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded">
+                                                Zurück
+                                            </button>
+                                        ` : ''}
+                                        <button onclick="app.nextDemoStep()" class="px-3 py-1.5 text-sm bg-blue-500 text-white rounded hover:bg-blue-600">
+                                            ${this.state.demoStep === this.state.demoSteps.length - 1 ? 'Fertig' : 'Weiter'}
+                                        </button>
+                                    </div>
                                 </div>
+                                ${this.renderModalArrow(modalPos.position)}
                             </div>
                         </div>
                     </div>
-                    ` : ''}
-                `;
+                    `;
             }
 
             highlightDemoTarget() {
@@ -682,6 +748,103 @@
                     target.classList.add('demo-highlight', 'ring-4', 'ring-blue-400', 'ring-opacity-75');
                     target.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
+            }
+
+            calculateModalPosition(targetElement) {
+                if (!targetElement) return { position: 'center' };
+
+                const rect = targetElement.getBoundingClientRect();
+                const viewport = { width: window.innerWidth, height: window.innerHeight };
+
+                const modalWidth = 400;
+                const modalHeight = 300;
+
+                const spaces = {
+                    top: rect.top,
+                    bottom: viewport.height - rect.bottom,
+                    left: rect.left,
+                    right: viewport.width - rect.right
+                };
+
+                if (spaces.right >= modalWidth + 20) {
+                    return { position: 'right', offset: { top: Math.max(20, rect.top - 50) } };
+                } else if (spaces.left >= modalWidth + 20) {
+                    return { position: 'left', offset: { top: Math.max(20, rect.top - 50) } };
+                } else if (spaces.bottom >= modalHeight + 20) {
+                    return { position: 'bottom', offset: { left: Math.max(20, rect.left - 100) } };
+                } else if (spaces.top >= modalHeight + 20) {
+                    return { position: 'top', offset: { left: Math.max(20, rect.left - 100) } };
+                } else {
+                    return { position: 'center' };
+                }
+            }
+
+            getModalStyles(modalPos) {
+                const styles = [];
+
+                switch(modalPos.position) {
+                    case 'right':
+                        styles.push(`position: fixed`);
+                        styles.push(`left: auto`);
+                        styles.push(`right: 20px`);
+                        styles.push(`top: ${modalPos.offset.top}px`);
+                        break;
+                    case 'left':
+                        styles.push(`position: fixed`);
+                        styles.push(`left: 20px`);
+                        styles.push(`right: auto`);
+                        styles.push(`top: ${modalPos.offset.top}px`);
+                        break;
+                    case 'bottom':
+                        styles.push(`position: fixed`);
+                        styles.push(`top: auto`);
+                        styles.push(`bottom: 20px`);
+                        styles.push(`left: ${modalPos.offset.left}px`);
+                        break;
+                    case 'top':
+                        styles.push(`position: fixed`);
+                        styles.push(`top: 20px`);
+                        styles.push(`bottom: auto`);
+                        styles.push(`left: ${modalPos.offset.left}px`);
+                        break;
+                    default:
+                        styles.push(`position: relative`);
+                        styles.push(`margin: auto`);
+                }
+
+                return styles.join('; ');
+            }
+
+            renderSpotlight(targetElement) {
+                const rect = targetElement.getBoundingClientRect();
+
+                return `
+                    <div class="spotlight-effect" style="
+                        position: fixed;
+                        top: ${rect.top - 8}px;
+                        left: ${rect.left - 8}px;
+                        width: ${rect.width + 16}px;
+                        height: ${rect.height + 16}px;
+                        border: 3px solid #3B82F6;
+                        border-radius: 8px;
+                        background: rgba(59, 130, 246, 0.1);
+                        pointer-events: none;
+                        z-index: 45;
+                        animation: spotlight-pulse 2s infinite;
+                    "></div>
+                `;
+            }
+
+            renderModalArrow(position) {
+                const arrows = {
+                    right: `<div class="modal-arrow modal-arrow-left"></div>`,
+                    left: `<div class="modal-arrow modal-arrow-right"></div>`,
+                    bottom: `<div class="modal-arrow modal-arrow-top"></div>`,
+                    top: `<div class="modal-arrow modal-arrow-bottom"></div>`,
+                    center: ''
+                };
+
+                return arrows[position] || '';
             }
 
             renderSkeletonCat() {
