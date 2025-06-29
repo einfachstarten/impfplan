@@ -101,19 +101,6 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
 
-        .dismissible-card::after {
-            content: "✨";
-            position: absolute;
-            top: 8px;
-            right: 12px;
-            font-size: 16px;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-        }
-
-        .dismissible-card:hover::after {
-            opacity: 0.6;
-        }
 
         @keyframes gentle-pulse {
             0%, 100% {
@@ -1231,7 +1218,7 @@
                                     ${!this.state.dismissedCards.motivational ? `
                                     <div data-card-id="motivational" class="dismissible-card bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-200 rounded-lg p-4 mb-6 group" role="button" tabindex="0" aria-label="Motivations-Karte - Klicken für Celebration" onkeydown="if(event.key==='Enter'||event.key===' ') this.click()">
                                         <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-60 transition-opacity duration-200 pointer-events-none">
-                                            <div class="flex items-center gap-1 text-xs text-gray-500 bg-white bg-opacity-80 rounded-full px-2 py-1">
+                                            <div class="flex items-center gap-1 text-xs text-gray-500 bg-white bg-opacity-80 rounded-full px-2 py-1 shadow-sm">
                                                 <span>✨</span>
                                                 <span>Klicken</span>
                                             </div>
@@ -1255,7 +1242,7 @@
                                     ${upcomingMilestone && !this.state.dismissedCards.milestone ? `
                                         <div data-card-id="milestone" class="dismissible-card bg-amber-50 border border-amber-200 rounded-lg p-3 group relative" role="button" tabindex="0" aria-label="Meilenstein-Karte - Klicken zum Ausblenden" onkeydown="if(event.key==='Enter'||event.key===' ') this.click()">
                                             <div class="absolute top-1 right-1 opacity-0 group-hover:opacity-70 transition-opacity duration-200">
-                                                <div class="text-xs bg-white bg-opacity-90 rounded-full w-6 h-6 flex items-center justify-center">
+                                                <div class="text-xs bg-white bg-opacity-90 rounded-full w-6 h-6 flex items-center justify-center shadow-sm">
                                                     🎉
                                                 </div>
                                             </div>
