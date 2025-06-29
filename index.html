@@ -132,87 +132,21 @@
             pointer-events: none;
         }
 
-        .cat {
-            position: relative;
-            width: 100%;
-            max-width: 12em;
-            overflow: hidden;
-            background-color: #e6dcdc;
+        .cat-spinner {
+            width: 120px;
+            height: 120px;
+            background-image: url('./icons/catspinner.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            animation: spin 2s linear infinite;
             border-radius: 50%;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
         }
 
-        .cat::before {
-            content: '';
-            display: block;
-            padding-bottom: 100%;
-        }
-
-        .cat:hover > * {
-            animation-play-state: paused;
-        }
-
-        .cat:active > * {
-            animation-play-state: running;
-        }
-
-        .cat-img-base {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            animation: rotating 2.79s cubic-bezier(.65, .54, .12, .93) infinite;
-        }
-
-        .cat-img-base::before {
-            content: '';
-            position: absolute;
-            width: 50%;
-            height: 50%;
-            background-size: 200%;
-            background-repeat: no-repeat;
-            background-image: url('https://images.weserv.nl/?url=i.imgur.com/M1raXX3.png&il');
-        }
-
-        .cat__head::before {
-            top: 0;
-            right: 0;
-            background-position: 100% 0%;
-            transform-origin: 0% 100%;
-            transform: rotate(90deg);
-        }
-
-        .cat__tail {
-            animation-delay: 0.2s;
-        }
-
-        .cat__tail::before {
-            left: 0;
-            bottom: 0;
-            background-position: 0% 100%;
-            transform-origin: 100% 0%;
-            transform: rotate(-30deg);
-        }
-
-        .cat__body {
-            animation-delay: 0.1s;
-        }
-
-        .cat__body:nth-of-type(2) {
-            animation-delay: 0.2s;
-        }
-
-        .cat__body::before {
-            right: 0;
-            bottom: 0;
-            background-position: 100% 100%;
-            transform-origin: 0% 0%;
-        }
-
-        @keyframes rotating {
-            from { transform: rotate(720deg); }
-            to { transform: none; }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
 
         .loader-title {
@@ -238,7 +172,6 @@
         }
 
         @media (max-width: 640px) {
-            .cat { max-width: 10em; }
             .loader-title { font-size: 1.25rem; }
         }
 
@@ -417,8 +350,6 @@
                     reminderTime: '19:30'
                 };
 
-                const img = new Image();
-                img.src = 'https://images.weserv.nl/?url=i.imgur.com/M1raXX3.png&il';
 
                 this.init();
             }
@@ -848,7 +779,14 @@
             }
 
             renderLoader() {
-                return '';
+                if (!this.state.showLoader) return '';
+                return `
+        <div class="cat-loader-overlay ${this.state.loadingComplete ? 'fade-out' : ''}">
+            <div class="cat-spinner"></div>
+            <h1 class="loader-title">Behandlungs-Tracker</h1>
+            <p class="loader-subtitle">Lade deine Katzen-Therapie App...</p>
+        </div>
+                `;
             }
 
             getMilestoneCountdown(upcomingMilestone, today) {
