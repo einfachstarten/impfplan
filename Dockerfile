@@ -10,6 +10,7 @@ RUN rm -rf /usr/share/nginx/html/*
 # Copy our HTML application
 COPY index.html /usr/share/nginx/html/
 COPY sw.js /usr/share/nginx/html/
+COPY health.js /usr/share/nginx/html/
 
 # Copy custom nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
