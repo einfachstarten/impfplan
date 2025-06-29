@@ -33,3 +33,9 @@ npx serve . -p 8080
 - Tailwind CSS (CDN)
 - PWA Support
 - Nginx (Production)
+
+## Versions
+
+Die aktuelle Version wird im Footer angezeigt und ist ebenfalls Bestandteil des
+Service-Worker Cache-Namens. Bei jedem Deployment sollte diese Versionsnummer
+inkrementiert werden, damit installierte PWAs stets die neueste Version laden.
