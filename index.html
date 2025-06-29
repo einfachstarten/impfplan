@@ -416,6 +416,8 @@
             }
 
             init() {
+                this.loadDismissedCards();
+                this.checkNewDay();
                 this.render();
 
                 setTimeout(() => {
@@ -424,9 +426,10 @@
                     this.render();
                 }, 2500);
 
-                // Update time every minute
+                // Update time every minute and check for a new day
                 setInterval(() => {
                     this.state.currentTime = new Date();
+                    this.checkNewDay();
                 }, 60000);
             }
 
@@ -552,7 +555,29 @@
             }
 
             toggleTreatment(date) {
+                const wasCompleted = this.state.treatmentData[date];
                 this.state.treatmentData[date] = !this.state.treatmentData[date];
+
+                if (!wasCompleted && this.state.treatmentData[date]) {
+                    const dayElement = document.querySelector(`[onclick="app.toggleTreatment('${date}')"]`);
+                    if (dayElement) {
+                        const treatmentDays = this.generateTreatmentDays(this.state.startDate);
+                        const dayData = treatmentDays.find(d => d.date === date);
+
+                        if (dayData?.isMilestone) {
+                            this.launchMilestoneConfetti(dayElement);
+                        } else {
+                            this.launchTreatmentConfetti(dayElement);
+                        }
+                    }
+
+                    if (this.getStreak() >= 7 && this.getStreak() % 7 === 0) {
+                        setTimeout(() => {
+                            this.launchStreakConfetti();
+                        }, 500);
+                    }
+                }
+
                 this.saveProgress();
                 this.render();
             }
@@ -861,7 +886,7 @@
             }
 
             renderSupportMessage() {
-                if (this.state.dismissedCards.support) return '';
+                if (this.isCardDismissedToday('support')) return '';
 
                 const hardDays = [10, 20, 30, 40, 50, 60];
                 const currentDay = Object.values(this.state.treatmentData).filter(Boolean).length;
@@ -915,6 +940,105 @@
                 return streak;
             }
 
+            isCardDismissedToday(cardType) {
+                const today = new Date().toISOString().split('T')[0];
+                const key = `${cardType}-${today}`;
+                return this.state.dismissedCards[key] || false;
+            }
+
+            loadDismissedCards() {
+                const stored = localStorage.getItem('treatment-dismissedCards');
+                if (stored) {
+                    this.state.dismissedCards = JSON.parse(stored);
+                }
+
+                const cutoffDate = new Date();
+                cutoffDate.setDate(cutoffDate.getDate() - 7);
+                const cutoffString = cutoffDate.toISOString().split('T')[0];
+
+                Object.keys(this.state.dismissedCards).forEach(key => {
+                    const match = key.match(/-(\d{4}-\d{2}-\d{2})$/);
+                    if (match && match[1] < cutoffString) {
+                        delete this.state.dismissedCards[key];
+                    }
+                });
+            }
+
+            checkNewDay() {
+                const currentDate = new Date().toISOString().split('T')[0];
+                const lastDate = localStorage.getItem('treatment-lastDate');
+
+                if (lastDate && lastDate !== currentDate) {
+                    this.render();
+                }
+
+                localStorage.setItem('treatment-lastDate', currentDate);
+            }
+
+            launchTreatmentConfetti(el) {
+                const { left, top, width, height } = el.getBoundingClientRect();
+                const x = (left + width / 2) / window.innerWidth;
+                const y = (top + height / 2) / window.innerHeight;
+
+                confetti({
+                    particleCount: 50,
+                    spread: 60,
+                    startVelocity: 25,
+                    angle: 90,
+                    origin: { x, y },
+                    colors: ['#10B981', '#34D399', '#6EE7B7'],
+                    disableForReducedMotion: true,
+                });
+            }
+
+            launchMilestoneConfetti(el) {
+                const { left, top, width, height } = el.getBoundingClientRect();
+                const x = (left + width / 2) / window.innerWidth;
+                const y = (top + height / 2) / window.innerHeight;
+
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    startVelocity: 30,
+                    angle: 90,
+                    origin: { x, y },
+                    colors: ['#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE'],
+                    disableForReducedMotion: true,
+                });
+
+                setTimeout(() => {
+                    confetti({
+                        particleCount: 80,
+                        spread: 100,
+                        startVelocity: 35,
+                        angle: 45,
+                        origin: { x: x - 0.1, y },
+                        colors: ['#F59E0B', '#FBBF24', '#FCD34D'],
+                        disableForReducedMotion: true,
+                    });
+
+                    confetti({
+                        particleCount: 80,
+                        spread: 100,
+                        startVelocity: 35,
+                        angle: 135,
+                        origin: { x: x + 0.1, y },
+                        colors: ['#EF4444', '#F87171', '#FCA5A5'],
+                        disableForReducedMotion: true,
+                    });
+                }, 200);
+            }
+
+            launchStreakConfetti() {
+                confetti({
+                    particleCount: 150,
+                    spread: 60,
+                    origin: { y: 0.6 },
+                    colors: ['#8B5CF6', '#10B981', '#F59E0B', '#EF4444'],
+                    disableForReducedMotion: true,
+                });
+            }
+
             launchConfetti(el) {
                 const { left, top, width, height } = el.getBoundingClientRect();
                 const x = (left + width / 2) / window.innerWidth;
@@ -931,8 +1055,12 @@
             }
 
             dismissCard(id, el) {
+                const today = new Date().toISOString().split('T')[0];
+                const key = `${id}-${today}`;
+
                 this.launchConfetti(el);
-                this.state.dismissedCards[id] = true;
+                this.state.dismissedCards[key] = true;
+                localStorage.setItem('treatment-dismissedCards', JSON.stringify(this.state.dismissedCards));
                 this.render();
             }
 
@@ -1185,7 +1313,7 @@
                                         ${Math.round(progressPercentage)}% abgeschlossen • ${84 - completedCount} Tage verbleibend
                                     </p>
 
-                                    ${!this.state.dismissedCards.motivational ? `
+                                    ${!this.isCardDismissedToday('motivational') ? `
                                     <div data-card-id="motivational" class="dismissible-card bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-200 rounded-lg p-4 mb-6 group" role="button" tabindex="0" aria-label="Motivations-Karte - Klicken für Celebration" onkeydown="if(event.key==='Enter'||event.key===' ') this.click()">
                                         <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-60 transition-opacity duration-200 pointer-events-none">
                                             <div class="flex items-center gap-1 text-xs text-gray-500 bg-white bg-opacity-80 rounded-full px-2 py-1 shadow-sm">
@@ -1209,7 +1337,7 @@
 
                                     ${this.renderSupportMessage()}
 
-                                    ${upcomingMilestone && !this.state.dismissedCards.milestone ? `
+                                    ${upcomingMilestone && !this.isCardDismissedToday('milestone') ? `
                                         <div data-card-id="milestone" class="dismissible-card bg-amber-50 border border-amber-200 rounded-lg p-3 group relative" role="button" tabindex="0" aria-label="Meilenstein-Karte - Klicken zum Ausblenden" onkeydown="if(event.key==='Enter'||event.key===' ') this.click()">
                                             <div class="absolute top-1 right-1 opacity-0 group-hover:opacity-70 transition-opacity duration-200">
                                                 <div class="text-xs bg-white bg-opacity-90 rounded-full w-6 h-6 flex items-center justify-center shadow-sm">
@@ -1228,7 +1356,7 @@
                                         </div>
                                     ` : ''}
 
-                                    ${!this.state.dismissedCards.healing ? `
+                                    ${!this.isCardDismissedToday('healing') ? `
                                     <div data-card-id="healing" class="dismissible-card bg-emerald-50 border border-emerald-200 rounded-lg p-3 mt-4 group relative" role="button" tabindex="0" aria-label="Heilungs-Karte - Klicken zum Ausblenden" onkeydown="if(event.key==='Enter'||event.key===' ') this.click()">
                                       <div class="absolute top-1 right-1 opacity-0 group-hover:opacity-60 transition-opacity duration-200">
                                         <span class="text-sm">💚</span>
@@ -1403,6 +1531,8 @@
                 localStorage.removeItem('treatment-reminderTime');
                 localStorage.removeItem('treatment-progress');
                 localStorage.removeItem('treatment-diary');
+                localStorage.removeItem('treatment-dismissedCards');
+                localStorage.removeItem('treatment-lastDate');
 
                 this.state.dismissedCards = {};
 
